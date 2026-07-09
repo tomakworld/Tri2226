@@ -64,10 +64,27 @@ function renderSwim(text, tp) {
 }
 function parseMS(s){ const m=/^(\d+):(\d{1,2})$/.exec((s||"").trim()); return m ? (+m[1])*60+(+m[2]) : null; }
 function parseHMM(s){ const m=/^(\d+):(\d{1,2})$/.exec((s||"").trim()); return m ? (+m[1])*3600+(+m[2])*60 : null; }
-function runPaces(str){
-  const t = parseHMM(str); if(!t) return null;
-  const mp = t/42.195;
-  return { easy:[mp*1.15, mp*1.28], long:[mp*1.08, mp*1.18], mp, thr: mp*0.955, itv:[mp*0.88, mp*0.93], im:[mp+35, mp+55] };
+const DISTS = {
+  "226": { sw:3.8, bk:180, rn:42.2, k:1,   bikeIF:[0.70,0.75], imOff:[35,55] },
+  "113": { sw:1.9, bk:90,  rn:21.1, k:0.7, bikeIF:[0.78,0.83], imOff:[15,30] },
+};
+/* 跑步配速:以半馬PB為錨(Daniels式換算) */
+function runPaces(hmStr, dist){
+  const t = parseHMM(hmStr); if(!t) return null;
+  const hp = t/21.0975;
+  const mp = hp*1.055;
+  const off = (dist||DISTS["226"]).imOff;
+  return { easy:[mp*1.15, mp*1.28], long:[mp*1.08, mp*1.18], mp, thr: hp, itv:[hp*0.93, hp*0.96], im:[mp+off[0], mp+off[1]] };
+}
+/* 無比賽成績:以單項PB預測拆分(平路假設,誤差±10-15%) */
+function predictSplits(profile, dist){
+  const tp = parseMS(profile.tpace), hm = parseHMM(profile.hm), ftp = +profile.ftp;
+  if (!tp || !hm || !ftp) return null;
+  const swim = tp * 1.10 * (dist.sw*10);
+  const v = Math.pow((ftp * (dist.bikeIF[0]+dist.bikeIF[1])/2) / 0.0061, 1/3);
+  const bike = dist.bk / v * 3600;
+  const run = dist.id==="113" ? hm + 13*60 : hm*2.085 + 38*60;
+  return { s:swim, b:bike, r:run };
 }
 function round5(v){ return Math.round(v/5)*5; }
 function round50(v){ return Math.round(v/50)*50; }
@@ -86,8 +103,8 @@ const STRENGTH = {
 };
 
 /* ---------------- swim/bike generators ---------------- */
-function genSwimBike(phase, wi, rec) {
-  const f = rec ? 0.72 : 1;
+function genSwimBike(phase, wi, rec, dist) {
+  const f = (rec ? 0.72 : 1) * dist.k;
   if (phase === "base") {
     const r1=Math.max(6,Math.round((8+(wi-1))*f)), r2=Math.max(6,Math.round((10+(wi-1)*2)*f));
     const d3=Math.max(1400,round50((2000+(wi-1)*250)*f));
@@ -135,6 +152,30 @@ function genSwimBike(phase, wi, rec) {
     }};
   }
   if (phase === "peak") {
+    if (dist.id === "113") {
+      const T113 = [
+        { swim:{ tue:{t:"有氧維持", x:"熱身400m;主課 5x200m {EN2} 息20秒;緩和200m", v:"1600m"},
+                 fri:{t:"高強度閾值", x:"熱身400m;主課 4x300m {THR} 息30秒;緩和200m", v:"1800m"},
+                 sun:{t:"長泳✕配速", x:"連續1800m {EN1},後500m比賽配速;緩和200m", v:"2000m"} },
+          bike:{ wed:{t:"Z2+Sweet Spot", x:"70分 {Z2},中段2x10分 Sweet Spot(88-93%FTP)", v:"70分", tss:60},
+                 thu:{t:"FTP高峰", x:"熱身15分;主課 2x20分 {Z4} 下緣;息5分;緩和10分", v:"90分", tss:82},
+                 sat:{t:"90km前哨+Brick", x:"比賽配速 {Z3}上緣;戶外160分/室內135分;下車接20分113配速跑", v:"2.7hr+20分", tss:158} } },
+        { key:true,
+          swim:{ tue:{t:"量能維持", x:"熱身400m;主課 4x200m {EN2} 息20秒;緩和200m", v:"1400m"},
+                 fri:{t:"高強度閾值", x:"熱身400m;主課 4x250m {THR} 息25秒;緩和200m", v:"1600m"},
+                 sun:{t:"🔑長泳關鍵", x:"連續2200m,全程比賽配速,演練補給;緩和200m", v:"2400m"} },
+          bike:{ wed:{t:"恢復迴轉", x:"45分 {Z1}~{Z2}", v:"45分", tss:25},
+                 thu:{t:"FTP高峰", x:"熱身15分;主課 2x22分 {Z4} 下緣;息7分;緩和10分", v:"90分", tss:85},
+                 sat:{t:"🔑90km關鍵+Brick", x:"全程比賽配速 {Z3}上緣,務必戶外,165-180分;下車接30分113配速跑 — 最重單日", v:"3hr+30分", tss:190} } },
+        { swim:{ tue:{t:"量能收斂", x:"熱身400m;主課 3x200m {EN2} 息20秒;緩和200m", v:"1200m"},
+                 fri:{t:"閾值維持", x:"熱身400m;主課 3x250m {THR} 息25秒;緩和200m", v:"1350m"},
+                 sun:{t:"中距收量", x:"連續1600m {EN1};緩和200m", v:"1800m"} },
+          bike:{ wed:{t:"恢復迴轉", x:"40分 {Z1}~{Z2}", v:"40分", tss:22},
+                 thu:{t:"FTP維持", x:"熱身15分;主課 3x10分 {Z4};息4分;緩和10分", v:"65分", tss:58},
+                 sat:{t:"長騎收斂", x:"{Z2} 含20分比賽配速;室內105分/戶外120分", v:"2hr", tss:96} } },
+      ];
+      return T113[Math.min(wi-1, 2)];
+    }
     const T = [
       { swim:{ tue:{t:"有氧維持", x:"熱身400m;技術6x50m;主課 6x200m {EN2} 息20秒;緩和200m", v:"2200m"},
                fri:{t:"高強度閾值", x:"熱身400m;主課 6x300m {THR} 息30秒;緩和200m", v:"2600m"},
@@ -176,7 +217,9 @@ function genSwimBike(phase, wi, rec) {
 }
 
 /* ---------------- run generator ---------------- */
-function genRun(phase, wi, rec, rp, key) {
+function genRun(phase, wi, rec, rp, key, dist) {
+  const kk = dist && dist.id==="113" ? 0.8 : 1;
+  const capLong = dist && dist.id==="113" ? 24 : 30;
   const P = (a) => rp ? `${paceStr(a)}/km` : "自覺強度";
   const PR = (a,b) => rp ? `${paceStr(a)}-${paceStr(b)}/km` : "自覺強度";
   const easy = rp ? PR(rp.easy[0], rp.easy[1]) : "對話配速";
@@ -188,7 +231,7 @@ function genRun(phase, wi, rec, rp, key) {
   const easyRun = { t:"輕鬆跑", x:`30-45分 @${easy},純恢復`, v:"30-45分" };
 
   if (phase === "base") {
-    const lk = rec ? 14 : 16 + wi*2;
+    const lk = Math.round((rec ? 14 : 16 + wi*2)*kk);
     return {
       wed:{ t:"間歇", x:`熱身2km;${rec?6:8+wi}x400m @${itv} 慢跑200m恢復;緩和1km`, v:`${rec?6:8+wi}x400m` },
       thu: easyRun,
@@ -198,7 +241,7 @@ function genRun(phase, wi, rec, rp, key) {
     };
   }
   if (phase === "build1") {
-    const lk = rec ? 16 : 21 + wi*2;
+    const lk = Math.round((rec ? 16 : 21 + wi*2)*kk);
     return {
       wed:{ t:"間歇", x:`熱身2km;${rec?3:5}x1000m @${thr} 休2分;緩和1km`, v:`${rec?3:5}x1000m` },
       thu: easyRun,
@@ -208,7 +251,7 @@ function genRun(phase, wi, rec, rp, key) {
     };
   }
   if (phase === "build2") {
-    const lk = Math.min(rec ? 18 : 24 + wi*2, 30);
+    const lk = Math.min(Math.round((rec ? 18 : 24 + wi*2)*kk), capLong);
     return {
       wed:{ t:"巡航間歇", x:`熱身2km;${rec?2:3}x2000m @${thr} 休90秒;緩和1km`, v:`${rec?2:3}x2km` },
       thu: easyRun,
@@ -230,7 +273,7 @@ function genRun(phase, wi, rec, rp, key) {
       thu: easyRun,
       fri:{ t:"226配速", x:`熱身1km;8-10km @${im},末2km提至 ${mp};緩和1km`, v:"8-10km" },
       sat: easyRun,
-      sun:{ t:"長跑", x:`${wi===1?28:20}km @${lng},末6km @${im}`, v:`${wi===1?28:20}km` },
+      sun:{ t:"長跑", x:`${Math.round((wi===1?28:20)*kk)}km @${lng},末6km @${im}`, v:`${Math.round((wi===1?28:20)*kk)}km` },
     };
   }
   const last = wi >= 2;
@@ -244,7 +287,7 @@ function genRun(phase, wi, rec, rp, key) {
 }
 
 /* ---------------- plan builder ---------------- */
-function buildPlan(raceDateStr) {
+function buildPlan(raceDateStr, dist) {
   const race = new Date(raceDateStr + "T00:00:00");
   if (isNaN(race)) return null;
   const start = mondayOfThisWeek();
@@ -263,7 +306,7 @@ function buildPlan(raceDateStr) {
   const push = (phase, count) => {
     for (let wi = 1; wi <= count; wi++) {
       const rec = ["base","build1","build2"].includes(phase) && wi === count && count >= 3;
-      const sb = genSwimBike(phase, wi, rec);
+      const sb = genSwimBike(phase, wi, rec, dist);
       weeks.push({ n: idx++, phase, rest: rec, key: !!sb.key, swim: sb.swim, bike: sb.bike, wi });
     }
   };
@@ -276,7 +319,7 @@ function buildPlan(raceDateStr) {
 
 /* ---------------- main ---------------- */
 export default function IronmanPlan() {
-  const [profile, setProfile] = useState({ height: 175, weight: 68, ftp: 250, tpace: "1:35", marathon: "3:20", raceDate: "2026-11-08", lastSwim: "", lastBike: "", lastRun: "", goal: "", adjS: 0, adjB: 0, adjR: 0 });
+  const [profile, setProfile] = useState({ height: 175, weight: 68, ftp: 250, tpace: "1:35", hm: "1:32", dist: "226", raceDate: "2026-11-08", lastSwim: "", lastBike: "", lastRun: "", goal: "", adjS: 0, adjB: 0, adjR: 0 });
   const [editing, setEditing] = useState(true);
   const [selected, setSelected] = useState(1);
   const [expanded, setExpanded] = useState(null);
@@ -296,8 +339,9 @@ export default function IronmanPlan() {
     try { await storage.set("athlete:profile", JSON.stringify(next), false); } catch (e) {}
   }
 
-  const plan = useMemo(() => buildPlan(profile.raceDate), [profile.raceDate]);
-  const rp = runPaces(profile.marathon);
+  const dist = { id: profile.dist || "226", ...DISTS[profile.dist || "226"] };
+  const plan = useMemo(() => buildPlan(profile.raceDate, dist), [profile.raceDate, profile.dist]);
+  const rp = runPaces(profile.hm, dist);
   const tpaceSec = parseMS(profile.tpace);
   const now = new Date();
 
@@ -315,7 +359,7 @@ export default function IronmanPlan() {
   const phase = PHASES[week.phase];
   const dateFor = (weekN, dayKey) => { const d = new Date(start); d.setDate(d.getDate() + (weekN-1)*7 + DAY_OFFSET[dayKey]); return d; };
   const bikeTss = week.race ? 0 : (week.bike.wed.tss||0)+(week.bike.thu.tss||0)+(week.bike.sat.tss||0);
-  const run = week.race ? null : genRun(week.phase, week.wi, week.rest, rp, week.key);
+  const run = week.race ? null : genRun(week.phase, week.wi, week.rest, rp, week.key, dist);
   const monMonth = dateFor(week.n, "mon").getMonth() + 1;
   const RUNCOLOR = { wed:C.red, thu:C.green, fri:C.red, sat:C.green, sun:C.gold };
 
@@ -369,7 +413,7 @@ export default function IronmanPlan() {
       </div>
 
       {week.race ? (
-        <RaceWeekView profile={profile} rp={rp} dateFor={dateFor} weekN={week.n} raceDate={new Date(profile.raceDate+"T00:00:00")} />
+        <RaceWeekView profile={profile} rp={rp} dist={dist} dateFor={dateFor} weekN={week.n} raceDate={new Date(profile.raceDate+"T00:00:00")} />
       ) : (
         <div style={{ border:`1px solid ${C.line}`, borderRadius:12, overflow:"hidden", background:C.surface }}>
           {rows.map((row, ri) => {
@@ -428,7 +472,7 @@ function Shell({ profile, editing, setEditing, saveProfile, rp, raceInfo, childr
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "20px 16px 50px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div>
-            <h1 className="osw" style={{ fontSize: 21, fontWeight: 600, margin: 0, letterSpacing: 0.5 }}>Ironman 226 訓練面板</h1>
+            <h1 className="osw" style={{ fontSize: 21, fontWeight: 600, margin: 0, letterSpacing: 0.5 }}>Ironman 訓練面板</h1>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{raceInfo || "輸入數據,自動生成整期課表"}</div>
           </div>
           <button onClick={() => setEditing((v) => !v)} style={{ background: C.surface, border:`1px solid ${C.line}`, borderRadius:10, padding:"7px 10px", color:C.text, display:"flex", gap:5, alignItems:"center", cursor:"pointer", fontSize:12, flexShrink:0 }}>
@@ -439,13 +483,24 @@ function Shell({ profile, editing, setEditing, saveProfile, rp, raceInfo, childr
         {editing && (
           <div style={{ background: C.surface, border:`1px solid ${C.line}`, borderRadius:12, padding:14, marginBottom:12 }}>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+              <Field label="賽事距離">
+                <div style={{ display:"flex", gap:6 }}>
+                  {["226","113"].map(d => (
+                    <button key={d} onClick={() => saveProfile({ ...profile, dist:d })}
+                      style={{ flex:1, padding:"8px 0", borderRadius:8, cursor:"pointer", fontFamily:"'Roboto Mono',monospace", fontSize:14, fontWeight:600,
+                        background: (profile.dist||"226")===d ? C.water : "#fff",
+                        color: (profile.dist||"226")===d ? "#fff" : C.text,
+                        border:`1px solid ${(profile.dist||"226")===d ? C.water : C.line}` }}>{d}</button>
+                  ))}
+                </div>
+              </Field>
               <Field label="比賽日期"><input type="date" value={profile.raceDate} onChange={(e) => saveProfile({ ...profile, raceDate:e.target.value })} /></Field>
-              <Field label="全馬成績 h:mm"><input type="text" placeholder="3:20" value={profile.marathon} onChange={(e) => saveProfile({ ...profile, marathon:e.target.value })} /></Field>
+              <Field label="半馬PB h:mm"><input type="text" placeholder="1:32" value={profile.hm} onChange={(e) => saveProfile({ ...profile, hm:e.target.value })} /></Field>
               <Field label="FTP (W)"><input type="number" value={profile.ftp} onChange={(e) => saveProfile({ ...profile, ftp:+e.target.value })} /></Field>
               <Field label="游泳T-pace mm:ss"><input type="text" placeholder="1:35" value={profile.tpace} onChange={(e) => saveProfile({ ...profile, tpace:e.target.value })} /></Field>
-              <Field label="上次226 游 h:mm"><input type="text" placeholder="1:25" value={profile.lastSwim} onChange={(e) => saveProfile({ ...profile, lastSwim:e.target.value })} /></Field>
-              <Field label="上次226 騎 h:mm"><input type="text" placeholder="5:55" value={profile.lastBike} onChange={(e) => saveProfile({ ...profile, lastBike:e.target.value })} /></Field>
-              <Field label="上次226 跑 h:mm"><input type="text" placeholder="3:50" value={profile.lastRun} onChange={(e) => saveProfile({ ...profile, lastRun:e.target.value })} /></Field>
+              <Field label="上次比賽 游 h:mm"><input type="text" placeholder="1:25" value={profile.lastSwim} onChange={(e) => saveProfile({ ...profile, lastSwim:e.target.value })} /></Field>
+              <Field label="上次比賽 騎 h:mm"><input type="text" placeholder="5:55" value={profile.lastBike} onChange={(e) => saveProfile({ ...profile, lastBike:e.target.value })} /></Field>
+              <Field label="上次比賽 跑 h:mm"><input type="text" placeholder="3:50" value={profile.lastRun} onChange={(e) => saveProfile({ ...profile, lastRun:e.target.value })} /></Field>
               <Field label="目標完賽 h:mm"><input type="text" placeholder="10:45" value={profile.goal} onChange={(e) => saveProfile({ ...profile, goal:e.target.value })} /></Field>
             </div>
           </div>
@@ -469,8 +524,16 @@ function Shell({ profile, editing, setEditing, saveProfile, rp, raceInfo, childr
 
 /* ---------------- goal analysis + 強項微調 ---------------- */
 function GoalAnalysis({ profile, saveProfile }) {
-  const sS=parseHMM(profile.lastSwim), sB=parseHMM(profile.lastBike), sR=parseHMM(profile.lastRun), g=parseHMM(profile.goal);
-  if (!sS || !sB || !sR || !g) return null;
+  const dist = { id: profile.dist || "226", ...DISTS[profile.dist || "226"] };
+  const g = parseHMM(profile.goal);
+  if (!g) return null;
+  let sS=parseHMM(profile.lastSwim), sB=parseHMM(profile.lastBike), sR=parseHMM(profile.lastRun);
+  let predicted = false;
+  if (!sS || !sB || !sR) {
+    const pd = predictSplits(profile, dist);
+    if (!pd) return null;
+    sS = pd.s; sB = pd.b; sR = pd.r; predicted = true;
+  }
   const TRANS = 12*60;
   const lastMove = sS+sB+sR;
   const k = (g - TRANS) / lastMove;
@@ -482,14 +545,15 @@ function GoalAnalysis({ profile, saveProfile }) {
   const aggressive = k < 0.93;
   const setAdj = (key, delta) => saveProfile({ ...profile, [key]: (profile[key]||0) + delta });
   const rows = [
-    ["游 3.8k", sS, tgt.s, `${paceStr(tgt.s/38)}/100m`, "adjS"],
-    ["騎 180k", sB, tgt.b, `${(180/(tgt.b/3600)).toFixed(1)}km/h`, "adjB"],
-    ["跑 42.2k", sR, tgt.r, `${paceStr(tgt.r/42.195)}/km`, "adjR"],
+    [`游 ${dist.sw}k`, sS, tgt.s, `${paceStr(tgt.s/(dist.sw*10))}/100m`, "adjS"],
+    [`騎 ${dist.bk}k`, sB, tgt.b, `${(dist.bk/(tgt.b/3600)).toFixed(1)}km/h`, "adjB"],
+    [`跑 ${dist.rn}k`, sR, tgt.r, `${paceStr(tgt.r/dist.rn)}/km`, "adjR"],
   ];
   return (
     <div style={{ background:C.surface, border:`1px solid ${aggressive?C.red:C.line}`, borderRadius:12, padding:"10px 12px", marginBottom:12 }}>
       <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6, flexWrap:"wrap" }}>
-        <span className="osw" style={{ fontSize:12, color:C.gold, fontWeight:700, letterSpacing:0.5 }}>目標拆分</span>
+        <span className="osw" style={{ fontSize:12, color:C.gold, fontWeight:700, letterSpacing:0.5 }}>目標拆分·{dist.id}</span>
+        <span style={{ fontSize:10, color: predicted?C.power:C.green, border:`1px solid ${predicted?C.power:C.green}`, borderRadius:4, padding:"1px 5px" }}>{predicted ? "PB預測±10-15%" : "實測"}</span>
         <span style={{ fontSize:11, color:C.muted }}>需進步{improvePct}%{aggressive && <b style={{color:C.red}}> ⚠️偏激進</b>}</span>
         <span className="mono" style={{ fontSize:11, marginLeft:"auto", color: diff===0?C.green:C.red }}>
           合計 {fmtHM(total)}{diff!==0 && `（${diff>0?"+":""}${diff}分）`}
@@ -502,7 +566,7 @@ function GoalAnalysis({ profile, saveProfile }) {
         ) : null}
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"auto 1fr 1fr 1fr auto", gap:"5px 10px", fontSize:12, alignItems:"center" }} className="mono">
-        <span/><span style={{ color:C.muted, fontSize:10.5 }}>上次</span><span style={{ color:C.muted, fontSize:10.5 }}>目標</span><span style={{ color:C.muted, fontSize:10.5 }}>配速</span><span style={{ color:C.muted, fontSize:10.5, fontFamily:"'Inter',sans-serif" }}>微調</span>
+        <span/><span style={{ color:C.muted, fontSize:10.5 }}>{predicted ? "預測" : "上次"}</span><span style={{ color:C.muted, fontSize:10.5 }}>目標</span><span style={{ color:C.muted, fontSize:10.5 }}>配速</span><span style={{ color:C.muted, fontSize:10.5, fontFamily:"'Inter',sans-serif" }}>微調</span>
         {rows.map(([n, last, t, pace, key]) => (
           <React.Fragment key={key}>
             <span style={{ fontFamily:"'Inter',sans-serif", fontWeight:600, fontSize:12 }}>{n}</span>
@@ -532,7 +596,7 @@ function MiniBtn({ onClick, children }) {
 }
 
 /* ---------------- race week ---------------- */
-function RaceWeekView({ profile, rp, dateFor, weekN, raceDate }) {
+function RaceWeekView({ profile, rp, dist, dateFor, weekN, raceDate }) {
   const raceDayIdx = (raceDate.getDay() + 6) % 7;
   const keys = ["mon","tue","wed","thu","fri","sat","sun"];
   const tasks = [
@@ -561,11 +625,11 @@ function RaceWeekView({ profile, rp, dateFor, weekN, raceDate }) {
         </div>
       )}
       <div style={{ border:`1.5px solid ${C.gold}`, borderRadius:12, padding:"12px 14px", background:"rgba(168,127,0,0.07)" }}>
-        <div style={{ fontWeight:700, fontSize:14, marginBottom:6, display:"flex", gap:6, alignItems:"center" }}><Flag size={15} color={C.gold}/>{DAY_LABEL[keys[raceDayIdx]]} {fmtDate(raceDate)} — 226 比賽日</div>
+        <div style={{ fontWeight:700, fontSize:14, marginBottom:6, display:"flex", gap:6, alignItems:"center" }}><Flag size={15} color={C.gold}/>{DAY_LABEL[keys[raceDayIdx]]} {fmtDate(raceDate)} — {dist.id} 比賽日</div>
         <div style={{ fontSize:12.5, lineHeight:1.7 }}>
-          <div><b style={{ color:C.water }}>游 3.8k</b>：輕鬆-中等,起跳勿快,善用跟游</div>
-          <div><b style={{ color:C.power }}>騎 180k</b>：70-75%FTP（{Math.round(profile.ftp*0.7)}-{Math.round(profile.ftp*0.75)}W）,15-20分補給一次</div>
-          <div><b style={{ color:C.red }}>跑 42.2k</b>：{rp ? `${paceStr(rp.im[0])}-${paceStr(rp.im[1])}/km` : "輕鬆-中等"},前10km壓慢</div>
+          <div><b style={{ color:C.water }}>游 {dist.sw}k</b>：輕鬆-中等,起跳勿快,善用跟游</div>
+          <div><b style={{ color:C.power }}>騎 {dist.bk}k</b>：{Math.round(dist.bikeIF[0]*100)}-{Math.round(dist.bikeIF[1]*100)}%FTP（{Math.round(profile.ftp*dist.bikeIF[0])}-{Math.round(profile.ftp*dist.bikeIF[1])}W）,15-20分補給一次</div>
+          <div><b style={{ color:C.red }}>跑 {dist.rn}k</b>：{rp ? `${paceStr(rp.im[0])}-${paceStr(rp.im[1])}/km` : "輕鬆-中等"},前段壓慢</div>
         </div>
       </div>
     </div>
