@@ -1,10 +1,22 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Waves, Bike as BikeIcon, Footprints, Dumbbell, Moon, ChevronLeft, ChevronRight, Flag, Sun, ChevronDown } from "lucide-react";
 
 /* ================= Season 專屬 226 課表 (B版) =================
    身高160 / 體重50 / FTP 192W (3.84 W/kg) / 全馬 3:20
    比賽 2026-11-08 · 18週 · 單車加強版 · 跑步採自主課表        */
 const FTP = 192, WEIGHT = 50;
+
+/* 儲存層:Claude 環境用 window.storage,自架網站自動改用 localStorage */
+const store = {
+  async get(k){
+    if (window.storage) { const r = await window.storage.get(k, false); return r ? r.value : null; }
+    return localStorage.getItem("season:" + k);
+  },
+  async set(k, v){
+    if (window.storage) return window.storage.set(k, v, false);
+    localStorage.setItem("season:" + k, v);
+  },
+};
 const PROGRAM_START = new Date(2026, 6, 6);
 const RACE_DATE = new Date(2026, 10, 8);
 const N = 18;
@@ -179,7 +191,27 @@ const STRENGTH = {
 export default function SeasonPlan(){
   const [sel, setSel] = useState(1);
   const [expanded, setExpanded] = useState(null);
+  const [runNotes, setRunNotes] = useState({});
+  const [savedKey, setSavedKey] = useState(null);
+  const timers = useRef({});
   useEffect(()=>{ setExpanded(null); }, [sel]);
+  useEffect(()=>{ (async()=>{
+    const notes = {};
+    for (const w of WEEKS) { if (w.race) continue;
+      for (const d of ["wed","thu","fri","sat","sun"]) {
+        try { const v = await store.get(`run:${w.n}:${d}`); if (v) notes[`${w.n}:${d}`] = v; } catch(e){}
+      }
+    }
+    setRunNotes(notes);
+  })(); }, []);
+  function onRun(w, d, val){
+    const key = `${w}:${d}`;
+    setRunNotes(prev => ({ ...prev, [key]: val }));
+    clearTimeout(timers.current[key]);
+    timers.current[key] = setTimeout(async ()=>{
+      try { await store.set(`run:${w}:${d}`, val); setSavedKey(key); setTimeout(()=>setSavedKey(null), 1500); } catch(e){}
+    }, 600);
+  }
   const now = new Date();
   const week = WEEKS.find(w=>w.n===sel);
   const phase = PHASES[week.phase];
@@ -188,14 +220,15 @@ export default function SeasonPlan(){
   const RC = { wed:C.red, thu:C.green, fri:C.red, sat:C.green, sun:C.gold };
 
   const mk = (icon,color,o,idp) => ({ id:idp, color, icon, title:o.t, vol:o.v, detail:o.x });
+  const runLabel = { wed:"間歇", thu:"慢跑", fri:"品質課", sat:"慢跑", sun:"長跑" };
   const rows = week.race ? [] : [
     { day:"mon", items:[{rest:true}] },
     { day:"tue", items:[ mk(<Dumbbell size={13}/>,C.iron,{t:"重量訓練",v:"",x:STRENGTH[week.phase]},"tue-s"), mk(<Waves size={13}/>,C.water,week.swim.tue,"tue-sw") ] },
-    { day:"wed", items:[ mk(<Footprints size={13}/>,RC.wed,{...week.run.wed,t:`跑·${week.run.wed.t}`},"wed-r"), mk(<BikeIcon size={13}/>,C.power,{...week.bike.wed,v:`${week.bike.wed.v}·TSS${week.bike.wed.tss}`},"wed-b") ] },
-    { day:"thu", items:[ mk(<Footprints size={13}/>,RC.thu,{...week.run.thu,t:`跑·${week.run.thu.t}`},"thu-r"), mk(<BikeIcon size={13}/>,C.power,{...week.bike.thu,v:`${week.bike.thu.v}·TSS${week.bike.thu.tss}`},"thu-b") ] },
-    { day:"fri", items:[ mk(<Footprints size={13}/>,RC.fri,{...week.run.fri,t:`跑·${week.run.fri.t}`},"fri-r"), mk(<Waves size={13}/>,C.water,week.swim.fri,"fri-sw") ] },
-    { day:"sat", items:[ mk(<Footprints size={13}/>,RC.sat,{...week.run.sat,t:`跑·${week.run.sat.t}`},"sat-r"), mk(<BikeIcon size={13}/>,C.power,{...week.bike.sat,v:`${week.bike.sat.v}·TSS${week.bike.sat.tss}`},"sat-b") ] },
-    { day:"sun", items:[ mk(<Footprints size={13}/>,RC.sun,{...week.run.sun,t:`跑·${week.run.sun.t}`},"sun-r"), mk(<Waves size={13}/>,C.water,week.swim.sun,"sun-sw") ] },
+    { day:"wed", items:[ {run:"wed"}, mk(<BikeIcon size={13}/>,C.power,{...week.bike.wed,v:`${week.bike.wed.v}·TSS${week.bike.wed.tss}`},"wed-b") ] },
+    { day:"thu", items:[ {run:"thu"}, mk(<BikeIcon size={13}/>,C.power,{...week.bike.thu,v:`${week.bike.thu.v}·TSS${week.bike.thu.tss}`},"thu-b") ] },
+    { day:"fri", items:[ {run:"fri"}, mk(<Waves size={13}/>,C.water,week.swim.fri,"fri-sw") ] },
+    { day:"sat", items:[ {run:"sat"}, mk(<BikeIcon size={13}/>,C.power,{...week.bike.sat,v:`${week.bike.sat.v}·TSS${week.bike.sat.tss}`},"sat-b") ] },
+    { day:"sun", items:[ {run:"sun"}, mk(<Waves size={13}/>,C.water,week.swim.sun,"sun-sw") ] },
   ];
 
   return (
@@ -269,6 +302,19 @@ export default function SeasonPlan(){
                   <div style={{ flex:1, padding:"6px 8px", display:"flex", flexDirection:"column", gap:4, minWidth:0 }}>
                     {row.items.map((it,ii)=>{
                       if (it.rest) return <div key={ii} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:C.muted, padding:"4px 2px" }}><Moon size={12}/> 全休</div>;
+                      if (it.run) {
+                        const key = `${week.n}:${it.run}`;
+                        return (
+                          <div key={ii} style={{ display:"flex", alignItems:"center", gap:6 }}>
+                            <span style={{ display:"flex", alignItems:"center", gap:3, fontSize:11, color:RC[it.run], flexShrink:0, width:56 }}>
+                              <Footprints size={12}/>{runLabel[it.run]}
+                            </span>
+                            <input value={runNotes[key]||""} onChange={(e)=>onRun(week.n, it.run, e.target.value)} placeholder="填入自主跑步課表…"
+                              style={{ flex:1, minWidth:0, background:"transparent", border:"none", borderBottom:`1px dashed ${C.line}`, borderRadius:0, padding:"2px 4px", fontFamily:"'Inter',sans-serif", fontSize:12.5, color:C.text, outline:"none" }} />
+                            <span style={{ width:14, flexShrink:0, fontSize:10, color:C.green }}>{savedKey===key?"✓":""}</span>
+                          </div>
+                        );
+                      }
                       const open = expanded===it.id;
                       return (
                         <div key={ii}>
