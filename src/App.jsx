@@ -482,6 +482,7 @@ function Shell({ profile, editing, setEditing, saveProfile, rp, raceInfo, childr
 
         {editing && (
           <div style={{ background: C.surface, border:`1px solid ${C.line}`, borderRadius:12, padding:14, marginBottom:12 }}>
+            <div style={{ fontSize:10.5, color:C.water, fontWeight:700, marginBottom:6, letterSpacing:0.5 }}>① 訓練強度數據（課表配速/瓦數的來源,必填）</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
               <Field label="賽事距離">
                 <div style={{ display:"flex", gap:6 }}>
@@ -498,6 +499,9 @@ function Shell({ profile, editing, setEditing, saveProfile, rp, raceInfo, childr
               <Field label="半馬PB h:mm"><input type="text" placeholder="1:32" value={profile.hm} onChange={(e) => saveProfile({ ...profile, hm:e.target.value })} /></Field>
               <Field label="FTP (W)"><input type="number" value={profile.ftp} onChange={(e) => saveProfile({ ...profile, ftp:+e.target.value })} /></Field>
               <Field label="游泳T-pace mm:ss"><input type="text" placeholder="1:35" value={profile.tpace} onChange={(e) => saveProfile({ ...profile, tpace:e.target.value })} /></Field>
+              </div>
+            <div style={{ fontSize:10.5, color:C.gold, fontWeight:700, margin:"12px 0 6px", letterSpacing:0.5 }}>② 拆分基準（僅影響目標拆分卡:有比賽成績優先採用,三項須齊全;未填則自動用①的PB預測）</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
               <Field label="上次比賽 游 h:mm"><input type="text" placeholder="1:25" value={profile.lastSwim} onChange={(e) => saveProfile({ ...profile, lastSwim:e.target.value })} /></Field>
               <Field label="上次比賽 騎 h:mm"><input type="text" placeholder="5:55" value={profile.lastBike} onChange={(e) => saveProfile({ ...profile, lastBike:e.target.value })} /></Field>
               <Field label="上次比賽 跑 h:mm"><input type="text" placeholder="3:50" value={profile.lastRun} onChange={(e) => saveProfile({ ...profile, lastRun:e.target.value })} /></Field>
@@ -529,7 +533,9 @@ function GoalAnalysis({ profile, saveProfile }) {
   if (!g) return null;
   let sS=parseHMM(profile.lastSwim), sB=parseHMM(profile.lastBike), sR=parseHMM(profile.lastRun);
   let predicted = false;
-  if (!sS || !sB || !sR) {
+  const filled = [sS,sB,sR].filter(Boolean).length;
+  const partial = filled > 0 && filled < 3;
+  if (filled < 3) {
     const pd = predictSplits(profile, dist);
     if (!pd) return null;
     sS = pd.s; sB = pd.b; sR = pd.r; predicted = true;
@@ -554,6 +560,7 @@ function GoalAnalysis({ profile, saveProfile }) {
       <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6, flexWrap:"wrap" }}>
         <span className="osw" style={{ fontSize:12, color:C.gold, fontWeight:700, letterSpacing:0.5 }}>目標拆分·{dist.id}</span>
         <span style={{ fontSize:10, color: predicted?C.power:C.green, border:`1px solid ${predicted?C.power:C.green}`, borderRadius:4, padding:"1px 5px" }}>{predicted ? "PB預測±10-15%" : "實測"}</span>
+        {partial && <span style={{ fontSize:10, color:C.red }}>⚠ 比賽成績只填{filled}/3項,未達採用門檻,目前用PB預測 — 補齊三項即切換為實測</span>}
         <span style={{ fontSize:11, color:C.muted }}>需進步{improvePct}%{aggressive && <b style={{color:C.red}}> ⚠️偏激進</b>}</span>
         <span className="mono" style={{ fontSize:11, marginLeft:"auto", color: diff===0?C.green:C.red }}>
           合計 {fmtHM(total)}{diff!==0 && `（${diff>0?"+":""}${diff}分）`}
