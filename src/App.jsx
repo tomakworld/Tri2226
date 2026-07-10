@@ -103,7 +103,8 @@ const STRENGTH = {
 };
 
 /* ---------------- swim/bike generators ---------------- */
-function genSwimBike(phase, wi, rec, dist) {
+function genSwimBike(phase, wiRaw, rec, dist) {
+  const wi = Math.min(wiRaw, 6);
   const f = (rec ? 0.72 : 1) * dist.k;
   if (phase === "base") {
     const r1=Math.max(6,Math.round((8+(wi-1))*f)), r2=Math.max(6,Math.round((10+(wi-1)*2)*f));
@@ -217,7 +218,8 @@ function genSwimBike(phase, wi, rec, dist) {
 }
 
 /* ---------------- run generator ---------------- */
-function genRun(phase, wi, rec, rp, key, dist) {
+function genRun(phase, wiRaw, rec, rp, key, dist) {
+  const wi = Math.min(wiRaw, 5);
   const kk = dist && dist.id==="113" ? 0.8 : 1;
   const capLong = dist && dist.id==="113" ? 24 : 30;
   const P = (a) => rp ? `${paceStr(a)}/km` : "自覺強度";
@@ -293,7 +295,7 @@ function buildPlan(raceDateStr, dist) {
   const start = mondayOfThisWeek();
   const days = Math.round((race - start) / 864e5);
   if (days < 21) return { error: "距比賽不足3週,建議直接進入減量與恢復。" };
-  const n = Math.min(30, Math.floor(days / 7) + 1);
+  const n = Math.min(40, Math.floor(days / 7) + 1);
   const taper = n >= 12 ? 2 : 1;
   const peak = n >= 16 ? 3 : n >= 12 ? 2 : 1;
   const trainWeeks = n - 1 - taper - peak;
@@ -305,7 +307,8 @@ function buildPlan(raceDateStr, dist) {
   let idx = 1;
   const push = (phase, count) => {
     for (let wi = 1; wi <= count; wi++) {
-      const rec = ["base","build1","build2"].includes(phase) && wi === count && count >= 3;
+      const isTrainPhase = ["base","build1","build2"].includes(phase);
+      const rec = isTrainPhase && count >= 3 && (wi === count || (wi % 4 === 0 && wi !== count));
       const sb = genSwimBike(phase, wi, rec, dist);
       weeks.push({ n: idx++, phase, rest: rec, key: !!sb.key, swim: sb.swim, bike: sb.bike, wi });
     }
