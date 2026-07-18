@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Waves, Bike as BikeIcon, Footprints, Dumbbell, Moon, ChevronLeft, ChevronRight, Flag, Sun, ChevronDown } from "lucide-react";
 
-/* ================= Season 專屬 226 課表 (B版) =================
+/* ============ Season 專屬 超長距離課表 (B版:游5k/騎205k/跑50k) ============
    身高160 / 體重50 / FTP 192W (3.84 W/kg) / 全馬 3:20
-   比賽 2026-11-08 · 18週 · 單車加強版 · 跑步採自主課表        */
-const FTP = 192, WEIGHT = 50;
+   比賽 2026-11-08 · 18週 · 游5000/騎205k/跑50k · 單車加強 · 跑步自主課表        */
+const FTP = 195, WEIGHT = 51;
 /* 游泳校準:泳池單獨100m出發間隔2:30(游約2:15)、團練跟游2:10 → 泳池T-pace≈2:15
    EN1連續游2:25-2:35 · EN2間隔2:40 · THR間隔2:30 · 比賽2:05靠防寒衣+跟游達成 */
 
@@ -35,7 +35,7 @@ const PHASES = {
   build2: { label:"強化期二", color:C.power, note:"長騎逼近比賽時長,Brick啟動" },
   peak:   { label:"巔峰期",   color:C.red,   note:"180km模擬,最重訓練區塊" },
   taper:  { label:"減量期",   color:C.green, note:"降量保強度,超補償" },
-  race:   { label:"比賽週",   color:C.gold,  note:"Season,去完成它吧!" },
+  race:   { label:"比賽週",   color:C.gold,  note:"Season,超長距離,去完成它!" },
 };
 function climate(m){ return m>=6&&m<=9 ? "高溫期:清晨/室內訓練,勤補電解質" : (m===5||m===10 ? "過渡季:長課清晨出發" : "涼爽季:配速貼近目標,品質黃金期"); }
 
@@ -51,7 +51,7 @@ function r50(v){ return Math.round(v/50)*50; }
 /* 功率速查(FTP 192W) */
 const Z = {
   Z1:`Z1 0-${W(0.55)}W`, Z2:`Z2 ${W(0.56)}-${W(0.75)}W`, Z3:`Z3 ${W(0.76)}-${W(0.90)}W`,
-  Z4:`Z4 ${W(0.91)}-${W(1.05)}W`, SS:`SS ${W(0.88)}-${W(0.93)}W`,
+  Z4:`Z4 ${W(0.91)}-${W(1.05)}W`, SS:`SS ${W(0.90)}-${W(0.93)}W(上半區)`,
 };
 
 /* ---- 跑步:自主課表(全馬3:20 → 226配速 5:19-5:39/km) ---- */
@@ -75,24 +75,24 @@ function gen(phase, wi, rec){
   const f = rec ? 0.72 : 1;
   if (phase==="base"){
     const r1=Math.max(6,Math.round((8+wi)*f)), r2=Math.max(6,Math.round((10+wi*2)*f));
-    const d3=Math.max(1400,r50((2000+(wi-1)*250)*f));
+    const d3=Math.max(1700,r50((2400+(wi-1)*300)*f));
     const bw=Math.max(60,r5((85+(wi-1)*5)*f)), bte=Math.max(8,Math.round((12+(wi-1)*2)*f));
-    const bs=Math.max(130,r5((185+(wi-1)*25)*f));
+    const bs=Math.max(140,r5((200+(wi-1)*25)*f));
     return { run:runOf(phase, Math.round((16+wi*2)*(rec?0.8:1)), rec), swim:{
       tue:{t:"技術✕有氧", x:`熱身400m;技術8x50m;主課 ${r1}x150m EN2 出發間隔2:40 (游約2:25,自然休約15秒);緩和200m`, v:`${800+r1*150+200}m`},
       fri:{t:"閾值間歇", x:`熱身400m;主課 ${r2}x100m 門檻 出發間隔2:30 (游約2:15,體感吃力但可重複);緩和200m`, v:`${400+r2*100+200}m`},
       sun:{t:"有氧耐力", x:`連續 ${d3}m 輕鬆連續游 2:25-2:35/100m;緩和200m`, v:`${d3+200}m`},
     }, bike:{
       wed:{t:"Z2+Tempo收尾", x:`${bw}分 ${Z.Z2},最後15分 ${Z.Z3};跑步間歇在前,間隔4小時+`, v:`${bw}分`, tss:tss([[bw-15,0.65],[15,0.83]])},
-      thu:{t:"閾值間歇", x:`熱身15分;主課 4x${bte}分 ${Z.Z3}上緣~${Z.Z4}下緣(室內取下緣,開風扇);息4分;緩和10分`, v:`${15+4*bte+16+10}分`, tss:tss([[15,0.6],[4*bte,0.88],[16,0.5],[10,0.55]])},
+      thu:{t:"閾值間歇", x:`熱身15分;主課 4x${bte}分 ${Z.Z3}上緣~${Z.Z4}下緣(恢復力佳:可取中段93-95%FTP即${W(0.93)}-${W(0.95)}W,務必開風扇);息4分;緩和10分`, v:`${15+4*bte+16+10}分`, tss:tss([[15,0.6],[4*bte,0.88],[16,0.5],[10,0.55]])},
       sat:{t:"長騎有氧", x:`${Z.Z2},室內${r5(bs*0.85)}分/戶外${bs}分;每20分補水+電解質`, v:`${bs}分`, tss:tss([[bs,0.65]])},
     }};
   }
   if (phase==="build1"){
     const r1=Math.max(4,Math.round((6+wi)*f)), r2=Math.max(3,Math.round((4+wi)*f));
-    const d3=Math.max(1800,r50((2600+(wi-1)*200)*f));
+    const d3=Math.max(2200,r50((3100+(wi-1)*250)*f));
     const bw=Math.max(65,r5((90+(wi-1)*5)*f)), bte=Math.max(12,Math.round((15+(wi-1)*2)*f));
-    const bs=Math.max(160,r5((240+(wi-1)*20)*f));
+    const bs=Math.max(175,r5((260+(wi-1)*20)*f));
     return { run:runOf(phase, Math.round((21+wi*2)*(rec?0.75:1)), rec), swim:{
       tue:{t:"有氧量能", x:`熱身400m;技術8x50m;主課 ${r1}x200m EN2 出發間隔2:45 (游約2:25);緩和200m`, v:`${800+r1*200+200}m`},
       fri:{t:"長閾值", x:`熱身400m;主課 ${r2}x300m 門檻 出發間隔2:35 (300m組:間隔7:45);緩和200m`, v:`${400+r2*300+200}m`},
@@ -105,9 +105,9 @@ function gen(phase, wi, rec){
   }
   if (phase==="build2"){
     const r1=Math.max(4,Math.round((6+wi)*f)), r2=Math.max(3,Math.round((5+wi)*f));
-    const d3=Math.max(2200,r50((3000+(wi-1)*200)*f));
+    const d3=Math.max(2600,r50((3600+(wi-1)*250)*f));
     const bw=Math.max(70,r5((95+(wi-1)*5)*f)), bte=Math.max(14,Math.round((18+(wi-1)*3)*f));
-    const bs=Math.max(195,r5((290+(wi-1)*25)*f));
+    const bs=Math.max(215,r5((320+(wi-1)*25)*f));
     const brick = wi>=2 && !rec;
     return { run:runOf(phase, Math.min(Math.round((24+wi*2)*(rec?0.75:1)),30), rec), swim:{
       tue:{t:"有氧維持", x:`熱身400m;技術6x50m;主課 ${r1}x200m EN2 出發間隔2:45 (游約2:25);緩和200m`, v:`${700+r1*200+200}m`},
@@ -116,7 +116,7 @@ function gen(phase, wi, rec){
     }, bike:{
       wed:{t:"Z2+Sweet Spot", x:`${bw}分 ${Z.Z2},中段2x18分 ${Z.SS};跑步間歇後4小時+`, v:`${bw}分`, tss:tss([[bw-36,0.65],[36,0.90]])},
       thu:{t:"FTP高峰", x:`熱身15分;主課 3x${bte}分 ${Z.Z4} 下緣;息5分;緩和10分`, v:`${15+3*bte+15+10}分`, tss:tss([[15,0.6],[3*bte,0.93],[15,0.5],[10,0.55]])},
-      sat:{t: brick?"長距+Brick":"長距耐力", x:`${Z.Z2}~${Z.Z3},室內${r5(bs*0.85)}分/戶外${bs}分${brick?";下車接20分226配速跑(5:19-5:39)":""}`, v:`${bs}分`, tss:tss([[bs,0.70]])},
+      sat:{t: brick?"長距+Brick":"長距耐力", x:`${Z.Z2}~${Z.Z3},室內${r5(bs*0.85)}分/戶外${bs}分${brick?";下車接20分超鐵配速跑(5:35-6:00)":""}`, v:`${bs}分`, tss:tss([[bs,0.70]])},
     }};
   }
   if (phase==="peak"){
@@ -128,7 +128,7 @@ function gen(phase, wi, rec){
         bike:{
           wed:{t:"Z2+Sweet Spot", x:`100分 ${Z.Z2},中段2x15分 ${Z.SS}`, v:"100分", tss:92},
           thu:{t:"FTP高峰", x:`熱身15分;主課 3x20分 ${Z.Z4} 下緣;息5分;緩和10分`, v:"110分", tss:105},
-          sat:{t:"前哨長騎+Brick", x:`比賽配速 ${Z.Z3};戶外280分/室內240分;下車接30分226配速跑`, v:"4.7hr+30分", tss:300} } },
+          sat:{t:"前哨長騎+Brick", x:`比賽配速 ${W(0.68)}-${W(0.72)}W;戶外300分/室內255分;下車接30分超鐵配速跑(5:35-6:00)`, v:"5hr+30分", tss:280} } },
       { key:true, run:runOf(phase,14,false), swim:{
           tue:{t:"量能維持", x:"熱身400m;主課 5x200m EN2 出發間隔2:45 (游約2:25);緩和200m", v:"2000m"},
           fri:{t:"高強度閾值", x:"熱身400m;主課 5x300m 門檻 出發間隔2:35 (300m組:間隔7:45);緩和200m", v:"2500m"},
@@ -136,7 +136,7 @@ function gen(phase, wi, rec){
         bike:{
           wed:{t:"恢復迴轉", x:`50分 ${Z.Z1}~${Z.Z2}`, v:"50分", tss:28},
           thu:{t:"FTP高峰", x:`熱身15分;主課 2x28分 ${Z.Z4} 下緣;息8分;緩和10分`, v:"105分", tss:99},
-          sat:{t:"🔑180km關鍵+Brick", x:`全程比賽配速 ${Z.Z3},務必戶外,310-340分;下車接40分226配速跑 — 最重單日`, v:"5.5hr+40分", tss:345} } },
+          sat:{t:"🔑205km關鍵+Brick", x:`全程比賽配速 ${W(0.68)}-${W(0.72)}W,務必戶外,345-375分;下車接40分超鐵配速跑(5:35-6:00) — 最重單日`, v:"6hr+40分", tss:330} } },
       { run:runOf(phase,20,false), swim:{
           tue:{t:"量能收斂", x:"熱身400m;主課 4x200m EN2 出發間隔2:45 (游約2:25);緩和200m", v:"1800m"},
           fri:{t:"閾值維持", x:"熱身400m;主課 4x250m 門檻 出發間隔2:35;緩和200m", v:"1800m"},
@@ -144,7 +144,7 @@ function gen(phase, wi, rec){
         bike:{
           wed:{t:"恢復迴轉", x:`45分 ${Z.Z1}~${Z.Z2}`, v:"45分", tss:24},
           thu:{t:"FTP維持", x:`熱身15分;主課 3x12分 ${Z.Z4};息4分;緩和10分`, v:"75分", tss:71},
-          sat:{t:"長騎收斂", x:`${Z.Z2} 含30分比賽配速;室內160分/戶外185分`, v:"3hr", tss:146} } },
+          sat:{t:"長騎收斂", x:`${Z.Z2} 含30分比賽配速;室內170分/戶外200分`, v:"3.3hr", tss:158} } },
     ];
     return T[Math.min(wi-1,2)];
   }
@@ -245,16 +245,16 @@ export default function SeasonPlan(){
       <div style={{ maxWidth:760, margin:"0 auto", padding:"20px 16px 50px" }}>
         {/* header */}
         <div style={{ marginBottom:12 }}>
-          <h1 className="osw" style={{ fontSize:22, fontWeight:700, margin:0, color:C.water }}>Season · 226 訓練計畫</h1>
+          <h1 className="osw" style={{ fontSize:22, fontWeight:700, margin:0, color:C.water }}>Season · 超長距離 5k/205k/50k</h1>
           <div style={{ fontSize:11.5, color:C.muted, marginTop:3 }}>
-            2026/11/8 比賽 · FTP {FTP}W（{(FTP/WEIGHT).toFixed(2)} W/kg）· 全馬3:20 · 泳池單獨T≈2:15/100m·海泳目標2:05(防寒衣+跟游,拆分約1:20-1:25) · 226跑段 5:19-5:39/km · 單車加強版 · 倒數 {N-sel>0?`${N-sel}週`:"本週"}
+            2026/11/8 比賽 · FTP {FTP}W（{(FTP/WEIGHT).toFixed(2)} W/kg,恢復力佳）· 全馬3:20 · 泳池單獨T≈2:15/100m·海泳目標2:05(防寒衣+跟游,拆分約1:20-1:25) · 226跑段 5:19-5:39/km · 單車加強版 · 倒數 {N-sel>0?`${N-sel}週`:"本週"}
           </div>
         </div>
 
         {/* 功率速查 */}
         <div className="mono" style={{ display:"flex", gap:6, flexWrap:"wrap", fontSize:11, marginBottom:10 }}>
           {Object.values(Z).map((t,i)=>(<span key={i} style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:6, padding:"2px 7px" }}>{t}</span>))}
-          <span style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:6, padding:"2px 7px", color:C.gold }}>比賽 {W(0.70)}-{W(0.75)}W</span>
+          <span style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:6, padding:"2px 7px", color:C.gold }}>比賽 {W(0.68)}-{W(0.72)}W</span>
           <span style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:6, padding:"2px 7px", color:C.water }}>游EN2 間隔2:40</span>
           <span style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:6, padding:"2px 7px", color:C.water }}>游THR 間隔2:30</span>
           <span style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:6, padding:"2px 7px", color:C.gold }}>游泳池2:15→賽2:05</span>
@@ -349,7 +349,7 @@ function RaceWeek(){
   const tasks = [
     ["一","全休;檢查裝備與補給採買"],
     ["二","游泳喚醒:300m+4x50m加速+200m"],
-    ["三",`單車喚醒:30分輕鬆,中段3x2分比賽配速(${W(0.72)}W);查車況`],
+    ["三",`單車喚醒:30分輕鬆,中段3x2分比賽配速(${W(0.70)}W);查車況`],
     ["四","輕鬆跑20分+4x20秒步幅;增加碳水"],
     ["五","移動/報到;熟悉轉換區;早睡"],
     ["六","檢錄/託運;15分極輕活動;確認氣象;早睡"],
@@ -367,11 +367,11 @@ function RaceWeek(){
         ))}
       </div>
       <div style={{ border:`1.5px solid ${C.gold}`, borderRadius:12, padding:"12px 14px", background:"rgba(168,127,0,0.08)" }}>
-        <div style={{ fontWeight:700, fontSize:14, marginBottom:6, display:"flex", gap:6, alignItems:"center" }}><Flag size={15} color={C.gold}/>日 11/8 — Season 的 226 比賽日</div>
+        <div style={{ fontWeight:700, fontSize:14, marginBottom:6, display:"flex", gap:6, alignItems:"center" }}><Flag size={15} color={C.gold}/>日 11/8 — Season 的超長距離比賽日</div>
         <div style={{ fontSize:12.5, lineHeight:1.7 }}>
-          <div><b style={{ color:C.water }}>游 3.8k</b>：目標2:05/100m(約1:19-1:25)—防寒衣+跟游是達成關鍵,起跳後盡快找到合適的腳跟</div>
-          <div><b style={{ color:C.power }}>騎 180k</b>：{W(0.70)}-{W(0.75)}W(70-75%FTP),15-20分補給一次</div>
-          <div><b style={{ color:C.red }}>跑 42.2k</b>：5:19-5:39/km,前10km刻意壓慢</div>
+          <div><b style={{ color:C.water }}>游 5.0k</b>：2:08-2:12/100m(約1:47-1:55)—配速務必保守,防寒衣+跟游是關鍵,後段避免肩膀掉速</div>
+          <div><b style={{ color:C.power }}>騎 205k</b>：{W(0.68)}-{W(0.72)}W(68-72%FTP,約6.5-7hr),每15分補給,每小時60g+碳水</div>
+          <div><b style={{ color:C.red }}>跑 50k</b>：5:35-6:00/km,前15km嚴格壓慢,後段允許走補給站策略</div>
         </div>
         <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>加油,去完成它!🎉</div>
       </div>
