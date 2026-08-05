@@ -5,6 +5,8 @@ import { Waves, Bike as BikeIcon, Footprints, Dumbbell, Moon, ChevronLeft, Chevr
    身高160 / 體重50 / FTP 192W (3.84 W/kg) / 全馬 3:20
    比賽 2026-11-08 · 18週 · 游5000/騎205k/跑50k · 單車加強 · 跑步自主課表        */
 const FTP = 195, WEIGHT = 51;
+/* FTP重測週:W8(8/24那週)、W15(每6週,巔峰末避開關鍵週) */
+const FTP_TEST_WEEKS = { 8:"8/24當週", 15:"10/12當週" };
 /* 游泳校準:泳池單獨100m出發間隔2:30(游約2:15)、團練跟游2:10 → 泳池T-pace≈2:15
    EN1連續游2:25-2:35 · EN2間隔2:40 · THR間隔2:30 · 比賽2:05靠防寒衣+跟游達成 */
 
@@ -85,7 +87,7 @@ function gen(phase, wi, rec){
     }, bike:{
       wed:{t:"Z2+Tempo收尾", x:`${bw}分 ${Z.Z2},最後15分 ${Z.Z3};跑步間歇在前,間隔4小時+`, v:`${bw}分`, tss:tss([[bw-15,0.65],[15,0.83]])},
       thu:{t:"閾值間歇", x:`熱身15分;主課 4x${bte}分 ${Z.Z3}上緣~${Z.Z4}下緣(恢復力佳:可取中段93-95%FTP即${W(0.93)}-${W(0.95)}W,務必開風扇);息4分;緩和10分`, v:`${15+4*bte+16+10}分`, tss:tss([[15,0.6],[4*bte,0.88],[16,0.5],[10,0.55]])},
-      sat:{t:"長騎有氧", x:`${Z.Z2},室內${r5(bs*0.85)}分/戶外${bs}分;每20分補水+電解質`, v:`${bs}分`, tss:tss([[bs,0.65]])},
+      sat:{t:"長騎有氧", x:`${Z.Z2},室內${r5(bs*0.85)}分/戶外${bs}分;每20分補水+電解質;室內分段:每45分變化一次(平地Z2→8分低迴轉65rpm→5分站姿→2分高迴轉110rpm)`, v:`${bs}分`, tss:tss([[bs,0.65]])},
     }};
   }
   if (phase==="build1"){
@@ -100,7 +102,7 @@ function gen(phase, wi, rec){
     }, bike:{
       wed:{t:"Z2+Sweet Spot", x:`${bw}分 ${Z.Z2},中段2x15分 ${Z.SS};跑步間歇後4小時+`, v:`${bw}分`, tss:tss([[bw-30,0.65],[30,0.90]])},
       thu:{t:"FTP強化", x:`熱身15分;主課 3x${bte}分 ${Z.Z4}(室內${W(0.91)}W起);息5分;緩和10分`, v:`${15+3*bte+15+10}分`, tss:tss([[15,0.6],[3*bte,0.92],[15,0.5],[10,0.55]])},
-      sat:{t:"長距耐力", x:`${Z.Z2},室內${r5(bs*0.85)}分/戶外${bs}分;鎖空力姿勢`, v:`${bs}分`, tss:tss([[bs,0.67]])},
+      sat:{t:"長距耐力", x:`${Z.Z2},室內${r5(bs*0.85)}分/戶外${bs}分;每45分變化一次(低迴轉/站姿/高迴轉輪替),每小時起身伸展1分;室內請刻意練習空力姿勢維持`, v:`${bs}分`, tss:tss([[bs,0.67]])},
     }};
   }
   if (phase==="build2"){
@@ -116,7 +118,7 @@ function gen(phase, wi, rec){
     }, bike:{
       wed:{t:"Z2+Sweet Spot", x:`${bw}分 ${Z.Z2},中段2x18分 ${Z.SS};跑步間歇後4小時+`, v:`${bw}分`, tss:tss([[bw-36,0.65],[36,0.90]])},
       thu:{t:"FTP高峰", x:`熱身15分;主課 3x${bte}分 ${Z.Z4} 下緣;息5分;緩和10分`, v:`${15+3*bte+15+10}分`, tss:tss([[15,0.6],[3*bte,0.93],[15,0.5],[10,0.55]])},
-      sat:{t: brick?"長距+Brick":"長距耐力", x:`${Z.Z2}~${Z.Z3},室內${r5(bs*0.85)}分/戶外${bs}分${brick?";下車接20分超鐵配速跑(5:35-6:00)":""}`, v:`${bs}分`, tss:tss([[bs,0.70]])},
+      sat:{t: brick?"長距+Brick":"長距耐力", x:`${Z.Z2}~${Z.Z3},室內${r5(bs*0.85)}分/戶外${bs}分;室內分段:每45分一個區塊(2x20分Z3 tempo穿插其中,打破單調並貼近比賽節奏),每小時起身1分${brick?";下車接20分超鐵配速跑(5:35-6:00)":""}`, v:`${bs}分`, tss:tss([[bs,0.70]])},
     }};
   }
   if (phase==="peak"){
@@ -128,7 +130,7 @@ function gen(phase, wi, rec){
         bike:{
           wed:{t:"Z2+Sweet Spot", x:`100分 ${Z.Z2},中段2x15分 ${Z.SS}`, v:"100分", tss:92},
           thu:{t:"FTP高峰", x:`熱身15分;主課 3x20分 ${Z.Z4} 下緣;息5分;緩和10分`, v:"110分", tss:105},
-          sat:{t:"前哨長騎+Brick", x:`比賽配速 ${W(0.68)}-${W(0.72)}W;戶外300分/室內255分;下車接30分超鐵配速跑(5:35-6:00)`, v:"5hr+30分", tss:280} } },
+          sat:{t:"前哨長騎+Brick", x:`比賽配速 ${W(0.68)}-${W(0.72)}W;戶外300分優先/室內255分;室內版拆成3x80分區塊,每區塊間下車補給伸展5分(不算休息,比賽也會有減速);下車接30分超鐵配速跑(5:35-6:00)`, v:"5hr+30分", tss:280} } },
       { key:true, run:runOf(phase,14,false), swim:{
           tue:{t:"量能維持", x:"熱身400m;主課 5x200m EN2 出發間隔2:45 (游約2:25);緩和200m", v:"2000m"},
           fri:{t:"高強度閾值", x:"熱身400m;主課 5x300m 門檻 出發間隔2:35 (300m組:間隔7:45);緩和200m", v:"2500m"},
@@ -136,7 +138,7 @@ function gen(phase, wi, rec){
         bike:{
           wed:{t:"恢復迴轉", x:`50分 ${Z.Z1}~${Z.Z2}`, v:"50分", tss:28},
           thu:{t:"FTP高峰", x:`熱身15分;主課 2x28分 ${Z.Z4} 下緣;息8分;緩和10分`, v:"105分", tss:99},
-          sat:{t:"🔑205km關鍵+Brick", x:`全程比賽配速 ${W(0.68)}-${W(0.72)}W,務必戶外,345-375分;下車接40分超鐵配速跑(5:35-6:00) — 最重單日`, v:"6hr+40分", tss:330} } },
+          sat:{t:"🔑205km關鍵+Brick", x:`全程比賽配速 ${W(0.68)}-${W(0.72)}W;此課務必戶外執行(6小時室內對意志與坐墊都是不必要的消耗,且練不到實路操控/風阻/補給動作),345-375分;若真的無法出門,室內版改為4x75分區塊+間隔5分下車補給;下車接40分超鐵配速跑 — 最重單日`, v:"6hr+40分", tss:330} } },
       { run:runOf(phase,20,false), swim:{
           tue:{t:"量能收斂", x:"熱身400m;主課 4x200m EN2 出發間隔2:45 (游約2:25);緩和200m", v:"1800m"},
           fri:{t:"閾值維持", x:"熱身400m;主課 4x250m 門檻 出發間隔2:35;緩和200m", v:"1800m"},
@@ -216,6 +218,7 @@ export default function SeasonPlan(){
   }
   const now = new Date();
   const week = WEEKS.find(w=>w.n===sel);
+  const isTestWeek = !!FTP_TEST_WEEKS[week.n];
   const phase = PHASES[week.phase];
   const bikeTss = week.race ? 0 : (week.bike.wed.tss+week.bike.thu.tss+week.bike.sat.tss);
   const month = dateFor(week.n,"mon").getMonth()+1;
@@ -227,7 +230,9 @@ export default function SeasonPlan(){
     { day:"mon", items:[{rest:true}] },
     { day:"tue", items:[ mk(<Dumbbell size={13}/>,C.iron,{t:"重量訓練",v:"",x:STRENGTH[week.phase]},"tue-s"), mk(<Waves size={13}/>,C.water,week.swim.tue,"tue-sw") ] },
     { day:"wed", items:[ {run:"wed"}, mk(<BikeIcon size={13}/>,C.power,{...week.bike.wed,v:`${week.bike.wed.v}·TSS${week.bike.wed.tss}`},"wed-b") ] },
-    { day:"thu", items:[ {run:"thu"}, mk(<BikeIcon size={13}/>,C.power,{...week.bike.thu,v:`${week.bike.thu.v}·TSS${week.bike.thu.tss}`},"thu-b") ] },
+    { day:"thu", items:[ {run:"thu"}, isTestWeek
+        ? mk(<BikeIcon size={13}/>,C.red,{t:"🔬 FTP 重測",v:"約60分",x:`熱身20分(含3x1分加速);20分鐘全力測驗(前2分別衝過頭,找到能撐滿20分的最大穩定輸出);緩和15分。取20分平均功率×0.95=新FTP。測驗當天週三課降為30分輕鬆迴轉、前一晚睡飽。測完把新數值告訴教練更新課表。現行FTP ${FTP}W → 目標區間 ${W(1.02)}-${W(1.08)}W`},"thu-test")
+        : mk(<BikeIcon size={13}/>,C.power,{...week.bike.thu,v:`${week.bike.thu.v}·TSS${week.bike.thu.tss}`},"thu-b") ] },
     { day:"fri", items:[ {run:"fri"}, mk(<Waves size={13}/>,C.water,week.swim.fri,"fri-sw") ] },
     { day:"sat", items:[ {run:"sat"}, mk(<BikeIcon size={13}/>,C.power,{...week.bike.sat,v:`${week.bike.sat.v}·TSS${week.bike.sat.tss}`},"sat-b") ] },
     { day:"sun", items:[ {run:"sun"}, mk(<Waves size={13}/>,C.water,week.swim.sun,"sun-sw") ] },
@@ -272,7 +277,7 @@ export default function SeasonPlan(){
                   style={{ flexShrink:0, minWidth:42, borderRadius:8, padding:"4px 3px", cursor:"pointer",
                     background: active?PHASES[w.phase].color:C.surface, color: active?"#fff":(past?C.muted:C.text),
                     border:`1px solid ${active?PHASES[w.phase].color:C.line}`, opacity: past&&!active?0.55:1, textAlign:"center" }}>
-                  <div style={{ fontSize:11, fontWeight:700 }}>{w.race?"🏁":`W${w.n}`}</div>
+                  <div style={{ fontSize:11, fontWeight:700 }}>{w.race?"🏁":(FTP_TEST_WEEKS[w.n]?`🔬${w.n}`:`W${w.n}`)}</div>
                   <div className="mono" style={{ fontSize:8.5 }}>{fmt(dateFor(w.n,"mon"))}</div>
                 </button>
               );
@@ -289,6 +294,7 @@ export default function SeasonPlan(){
           <span style={{ color:C.muted }}>{phase.note}</span>
           <span style={{ color:C.muted }}>|</span>
           <span style={{ color:C.muted, display:"flex", gap:4, alignItems:"center" }}><Sun size={11}/>{climate(month)}</span>
+          {isTestWeek && <span style={{ fontSize:11, color:C.red, fontWeight:600 }}>🔬 本週四 FTP 重測</span>}
           {!week.race && <span className="mono" style={{ fontSize:10.5, color:C.power, marginLeft:"auto" }}>騎TSS≈{bikeTss}</span>}
         </div>
 
