@@ -87,7 +87,7 @@ function gen(phase, wi, rec){
     }, bike:{
       wed:{t:"Z2+Tempo收尾", x:`${bw}分 ${Z.Z2},最後15分 ${Z.Z3};跑步間歇在前,間隔4小時+`, v:`${bw}分`, tss:tss([[bw-15,0.65],[15,0.83]])},
       thu:{t:"閾值間歇", x:`熱身15分;主課 4x${bte}分 ${Z.Z3}上緣~${Z.Z4}下緣(恢復力佳:可取中段93-95%FTP即${W(0.93)}-${W(0.95)}W,務必開風扇);息4分;緩和10分`, v:`${15+4*bte+16+10}分`, tss:tss([[15,0.6],[4*bte,0.88],[16,0.5],[10,0.55]])},
-      sat:{t:"長騎有氧", x:`${Z.Z2},室內${r5(bs*0.85)}分/戶外${bs}分;每20分補水+電解質;室內分段:每45分變化一次(平地Z2→8分低迴轉65rpm→5分站姿→2分高迴轉110rpm)`, v:`${bs}分`, tss:tss([[bs,0.65]])},
+      sat:{t:"長騎有氧", x:`${Z.Z2},室內${r5(bs*0.85)}分/戶外${bs}分;每20分補水+電解質;室內分段:每45分變化一次(平地Z2→8分低迴轉65rpm→5分站姿→2分高迴轉110rpm);【續航力】最後30分補 2x8分 ${W(0.75)}-${W(0.80)}W`, v:`${bs}分`, tss:tss([[bs-30,0.65],[16,0.78],[14,0.6]])},
     }};
   }
   if (phase==="build1"){
@@ -102,7 +102,7 @@ function gen(phase, wi, rec){
     }, bike:{
       wed:{t:"Z2+Sweet Spot", x:`${bw}分 ${Z.Z2},中段2x15分 ${Z.SS};跑步間歇後4小時+`, v:`${bw}分`, tss:tss([[bw-30,0.65],[30,0.90]])},
       thu:{t:"FTP強化", x:`熱身15分;主課 3x${bte}分 ${Z.Z4}(室內${W(0.91)}W起);息5分;緩和10分`, v:`${15+3*bte+15+10}分`, tss:tss([[15,0.6],[3*bte,0.92],[15,0.5],[10,0.55]])},
-      sat:{t:"長距耐力", x:`${Z.Z2},室內${r5(bs*0.85)}分/戶外${bs}分;每45分變化一次(低迴轉/站姿/高迴轉輪替),每小時起身伸展1分;室內請刻意練習空力姿勢維持`, v:`${bs}分`, tss:tss([[bs,0.67]])},
+      sat:{t:"長距耐力", x:`${Z.Z2},室內${r5(bs*0.85)}分/戶外${bs}分;每45分變化一次(低迴轉/站姿/高迴轉輪替),每小時起身1分;刻意練習空力姿勢維持;【續航力關鍵】最後45分補 3x10分 比賽功率${W(0.68)}-${W(0.72)}W(疲勞下才練得到的東西)`, v:`${bs}分`, tss:tss([[bs-45,0.66],[30,0.70],[15,0.6]])},
     }};
   }
   if (phase==="build2"){
@@ -118,7 +118,7 @@ function gen(phase, wi, rec){
     }, bike:{
       wed:{t:"Z2+Sweet Spot", x:`${bw}分 ${Z.Z2},中段2x18分 ${Z.SS};跑步間歇後4小時+`, v:`${bw}分`, tss:tss([[bw-36,0.65],[36,0.90]])},
       thu:{t:"FTP高峰", x:`熱身15分;主課 3x${bte}分 ${Z.Z4} 下緣;息5分;緩和10分`, v:`${15+3*bte+15+10}分`, tss:tss([[15,0.6],[3*bte,0.93],[15,0.5],[10,0.55]])},
-      sat:{t: brick?"長距+Brick":"長距耐力", x:`${Z.Z2}~${Z.Z3},室內${r5(bs*0.85)}分/戶外${bs}分;室內分段:每45分一個區塊(2x20分Z3 tempo穿插其中,打破單調並貼近比賽節奏),每小時起身1分${brick?";下車接20分超鐵配速跑(5:35-6:00)":""}`, v:`${bs}分`, tss:tss([[bs,0.70]])},
+      sat:{t: brick?"長距+Brick":"長距耐力", x:`${Z.Z2}為主,室內${r5(bs*0.85)}分/戶外${bs}分,每小時起身1分;【續航力關鍵】最後60分補 4x10分 比賽功率${W(0.68)}-${W(0.72)}W,組間5分Z2 — 這是全課最重要的段落,累了還要守住輸出${brick?";下車再接20分超鐵配速跑(5:35-6:00)":""}`, v:`${bs}分`, tss:tss([[bs-60,0.67],[40,0.70],[20,0.6]])},
     }};
   }
   if (phase==="peak"){
@@ -219,6 +219,7 @@ export default function SeasonPlan(){
   const now = new Date();
   const week = WEEKS.find(w=>w.n===sel);
   const isTestWeek = !!FTP_TEST_WEEKS[week.n];
+  const isLongWeek = !week.race;
   const phase = PHASES[week.phase];
   const bikeTss = week.race ? 0 : (week.bike.wed.tss+week.bike.thu.tss+week.bike.sat.tss);
   const month = dateFor(week.n,"mon").getMonth()+1;
@@ -298,6 +299,11 @@ export default function SeasonPlan(){
           {!week.race && <span className="mono" style={{ fontSize:10.5, color:C.power, marginLeft:"auto" }}>騎TSS≈{bikeTss}</span>}
         </div>
 
+        {!week.race && (
+          <div style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:10, padding:"8px 11px", marginBottom:10, fontSize:11, lineHeight:1.55, color:C.muted }}>
+            <b style={{ color:C.water }}>續航力監控</b>：長騎後看 TrainingPeaks 的 <span className="mono">Pw:HR</span> 脫鉤值 — 低於5%代表效率守住了,超過5-10%代表後段撐不住(通常是補水/補糖不足或有氧底子還要堆)。同一種課隔幾週比較這個數字變小,就是續航力進步的直接證據。
+          </div>
+        )}
         {week.race ? <RaceWeek/> : (
           <div style={{ border:`1px solid ${C.line}`, borderRadius:12, overflow:"hidden", background:C.surface }}>
             {rows.map((row,ri)=>{

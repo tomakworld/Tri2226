@@ -15,9 +15,6 @@ function Router() {
   if (hash.startsWith("#/sub3")) return <Sub3 />;
   return <App />;
 }
-
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <Router />
-  </React.StrictMode>
+  <React.StrictMode><Router /></React.StrictMode>
 );
