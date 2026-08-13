@@ -1,4 +1,3 @@
-import { storage } from "./storage.js";
 import React, { useState, useEffect, useMemo } from "react";
 import { Waves, Bike as BikeIcon, Footprints, Dumbbell, Moon, Settings2, ChevronLeft, ChevronRight, Flag, Sun, ChevronDown, Minus, Plus, RotateCcw } from "lucide-react";
 
@@ -330,7 +329,7 @@ export default function IronmanPlan() {
   useEffect(() => {
     (async () => {
       try {
-        const p = await storage.get("athlete:profile", false);
+        const p = await window.storage.get("athlete:profile", false);
         if (p && p.value) { setProfile((d) => ({ ...d, ...JSON.parse(p.value) })); setEditing(false); }
       } catch (e) {}
     })();
@@ -339,7 +338,7 @@ export default function IronmanPlan() {
 
   async function saveProfile(next) {
     setProfile(next);
-    try { await storage.set("athlete:profile", JSON.stringify(next), false); } catch (e) {}
+    try { await window.storage.set("athlete:profile", JSON.stringify(next), false); } catch (e) {}
   }
 
   const dist = { id: profile.dist || "226", ...DISTS[profile.dist || "226"] };
