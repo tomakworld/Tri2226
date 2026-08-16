@@ -314,7 +314,7 @@ export default function SeasonPlan(){
 
         {!week.race && (
           <div style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:10, padding:"8px 11px", marginBottom:10, fontSize:11, lineHeight:1.55, color:C.muted }}>
-            <b style={{ color:C.water }}>室內長課三要件</b>：①散熱 — 兩台風扇(上身+腿)、室溫≤24°C、每20分補水;8月實測第2-3小時掉10W多為熱負荷所致 ②補給 — 每小時碳水60-70g,長課前後量體重,掉超過2%代表補水不足 ③監控 — 記錄脫鉤值(目標<5%)與分段EF,同心率下功率提升即為進步。
+            <b style={{ color:C.water }}>室內長課三要件</b>：①散熱 — 兩台風扇(上身+腿)、室溫≤24°C、每20分補水;8月實測第2-3小時掉10W多為熱負荷所致 ②補給 — 每小時碳水60-70g,長課前後量體重,掉超過2%代表補水不足 ③監控 — 記錄脫鉤值(目標低於5%)與分段EF,同心率下功率提升即為進步。
           </div>
         )}
         {week.race ? <RaceWeek/> : (
