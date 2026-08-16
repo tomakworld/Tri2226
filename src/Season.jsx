@@ -56,7 +56,18 @@ const Z = {
   Z4:`Z4 ${W(0.91)}-${W(1.05)}W`, SS:`SS ${W(0.90)}-${W(0.93)}W(上半區)`,
 };
 
-/* ---- 跑步:自主課表(全馬3:20 → 226配速 5:19-5:39/km) ---- */
+/* ---- 跑步課表(教練提供,依階段微調;排程已與騎車課協調) ---- */
+function runPlan(){
+  return {
+    wed:{t:"間歇", x:"200m x20 @43秒 漸速跑,跑休200m/90秒", v:"20x200m"},
+    thu:{t:"配速跑", x:"10-12km @5:00 漸速跑", v:"10-12km"},
+    fri:{t:"慢跑", x:"慢跑", v:"慢跑"},
+    sat:{t:"間歇", x:"1200m x5 @4:36 休5分", v:"5x1200m"},
+    sun:{t:"長跑", x:"16-20km", v:"16-20km"},
+  };
+}
+
+/* ---- (舊)跑步:自主課表(全馬3:20 → 226配速 5:19-5:39/km) ---- */
 function runOf(phase, sunKm, rec){
   const fri = phase==="base"||phase==="build1"
     ? "1000m ×5-6 @3:45 休5分"
@@ -227,6 +238,8 @@ export default function SeasonPlan(){
 
   const mk = (icon,color,o,idp) => ({ id:idp, color, icon, title:o.t, vol:o.v, detail:o.x });
   const runLabel = { wed:"間歇", thu:"慢跑", fri:"品質課", sat:"慢跑", sun:"長跑" };
+  const RP = week.race ? null : runPlan();
+
   const rows = week.race ? [] : [
     { day:"mon", items:[{rest:true}] },
     { day:"tue", items:[ mk(<Dumbbell size={13}/>,C.iron,{t:"重量訓練",v:"",x:STRENGTH[week.phase]},"tue-s"), mk(<Waves size={13}/>,C.water,week.swim.tue,"tue-sw") ] },
@@ -321,14 +334,25 @@ export default function SeasonPlan(){
                       if (it.rest) return <div key={ii} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:C.muted, padding:"4px 2px" }}><Moon size={12}/> 全休</div>;
                       if (it.run) {
                         const key = `${week.n}:${it.run}`;
+                        const rp2 = RP[it.run];
+                        const open2 = expanded===`run-${it.run}`;
                         return (
-                          <div key={ii} style={{ display:"flex", alignItems:"center", gap:6 }}>
-                            <span style={{ display:"flex", alignItems:"center", gap:3, fontSize:11, color:RC[it.run], flexShrink:0, width:56 }}>
-                              <Footprints size={12}/>{runLabel[it.run]}
-                            </span>
-                            <input value={runNotes[key]||""} onChange={(e)=>onRun(week.n, it.run, e.target.value)} placeholder="填入自主跑步課表…"
-                              style={{ flex:1, minWidth:0, background:"transparent", border:"none", borderBottom:`1px dashed ${C.line}`, borderRadius:0, padding:"2px 4px", fontFamily:"'Inter',sans-serif", fontSize:12.5, color:C.text, outline:"none" }} />
-                            <span style={{ width:14, flexShrink:0, fontSize:10, color:C.green }}>{savedKey===key?"✓":""}</span>
+                          <div key={ii}>
+                            <button className="rowbtn" onClick={()=>setExpanded(open2?null:`run-${it.run}`)}
+                              style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"transparent", border:"none", color:C.text, cursor:"pointer", padding:"3px 2px", textAlign:"left", borderRadius:6 }}>
+                              <span style={{ color:RC[it.run], display:"flex", flexShrink:0 }}><Footprints size={13}/></span>
+                              <span style={{ fontSize:12.5, fontWeight:600, flexShrink:0 }}>跑·{rp2.t}</span>
+                              <span className="mono" style={{ fontSize:10.5, color:RC[it.run], marginLeft:"auto", flexShrink:0 }}>{rp2.v}</span>
+                              <ChevronDown size={13} color={C.muted} style={{ flexShrink:0, transform:open2?"rotate(180deg)":"none", transition:"transform .15s" }}/>
+                            </button>
+                            {open2 && (
+                              <div style={{ fontSize:12, opacity:0.85, lineHeight:1.6, padding:"2px 4px 6px 21px", borderLeft:`2px solid ${RC[it.run]}`, marginLeft:5, marginTop:2 }}>
+                                {rp2.x}
+                                <input value={runNotes[key]||""} onChange={(e)=>onRun(week.n, it.run, e.target.value)} placeholder="實際完成記錄/備註…"
+                                  style={{ width:"100%", marginTop:5, background:"transparent", border:"none", borderBottom:`1px dashed ${C.line}`, borderRadius:0, padding:"2px 0", fontFamily:"'Inter',sans-serif", fontSize:12, color:C.text, outline:"none" }} />
+                                <span style={{ fontSize:10, color:C.green }}>{savedKey===key?"✓ 已儲存":""}</span>
+                              </div>
+                            )}
                           </div>
                         );
                       }
