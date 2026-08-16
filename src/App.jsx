@@ -344,6 +344,13 @@ export default function IronmanPlan() {
   }, []);
   useEffect(() => { setExpanded(null); }, [selected]);
   const [autoJumped, setAutoJumped] = useState(false);
+  const planForJump = useMemo(() => buildPlan(profile.raceDate, { id: profile.dist || "226", ...DISTS[profile.dist || "226"] }, profile.startDate), [profile.raceDate, profile.dist, profile.startDate]);
+  useEffect(() => {
+    if (autoJumped || !planForJump || planForJump.error) return;
+    const cur = Math.floor((mondayOfThisWeek() - planForJump.start) / (7 * 864e5)) + 1;
+    if (cur >= 1 && cur <= planForJump.n) setSelected(cur);
+    setAutoJumped(true);
+  }, [planForJump, autoJumped]);
 
   async function saveProfile(next) {
     setProfile(next);
@@ -365,11 +372,6 @@ export default function IronmanPlan() {
   }
 
   const { weeks, n: N, start } = plan;
-  if (!autoJumped) {
-    const cur = Math.floor((mondayOfThisWeek() - start) / (7*864e5)) + 1;
-    if (cur >= 1 && cur <= N && cur !== selected) { setSelected(cur); }
-    setAutoJumped(true);
-  }
   const sel = Math.min(selected, N);
   const week = weeks.find((w) => w.n === sel);
   const phase = PHASES[week.phase];
@@ -516,6 +518,8 @@ function Shell({ profile, editing, setEditing, saveProfile, rp, raceInfo, childr
               <Field label="半馬PB h:mm"><input type="text" placeholder="1:32" value={profile.hm} onChange={(e) => saveProfile({ ...profile, hm:e.target.value })} /></Field>
               <Field label="FTP (W)"><input type="number" value={profile.ftp} onChange={(e) => saveProfile({ ...profile, ftp:+e.target.value })} /></Field>
               <Field label="游泳T-pace mm:ss"><input type="text" placeholder="1:35" value={profile.tpace} onChange={(e) => saveProfile({ ...profile, tpace:e.target.value })} /></Field>
+              <Field label="體重 kg"><input type="number" value={profile.weight} onChange={(e) => saveProfile({ ...profile, weight:+e.target.value })} /></Field>
+              <Field label="身高 cm"><input type="number" value={profile.height} onChange={(e) => saveProfile({ ...profile, height:+e.target.value })} /></Field>
               </div>
             <div style={{ fontSize:10.5, color:C.gold, fontWeight:700, margin:"12px 0 6px", letterSpacing:0.5 }}>② 拆分基準（僅影響目標拆分卡:有比賽成績優先採用,三項須齊全;未填則自動用①的PB預測）</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>

@@ -1,16 +1,11 @@
-# Ironman 226 訓練面板
+# 訓練課表平台
 
-18 週 226 全程超鐵訓練課表（游泳/單車自動生成、跑步手動填入、訓練台強度指引）。
-
-## 本地開發
-```bash
-npm install
-npm run dev
-```
+三個獨立課表,以網址區分:
+- `/` — 三鐵課表產生器(226/113,任何人輸入數據即生成)
+- `/#/season` — Season 專屬超長距離課表(游5k/騎205k/跑50k)
+- `/#/sub3` — Sub-3 全馬課表(Daniels VDOT)
 
 ## 部署到 Zeabur
-1. 將本專案推上 GitHub
-2. Zeabur → New Project → Deploy from GitHub → 選這個 repo
-3. Zeabur 會自動偵測 Vite 並完成建置,綁定網域後即可分享
+推上 GitHub → Zeabur New Project → Deploy from GitHub → 自動偵測 Vite → Generate Domain
 
-資料儲存:使用瀏覽器 localStorage,每位訪客的身高/FTP/跑步課表各自獨立保存在自己的裝置上。
+資料儲存於各使用者瀏覽器 localStorage。
