@@ -41,6 +41,7 @@ function mondayOfThisWeek() {
   return d;
 }
 function fmtDate(d) { return `${d.getMonth() + 1}/${d.getDate()}`; }
+function isoOfMonday(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
 /* ---------------- zone / pace math ---------------- */
 const BIKE_ZONES = { Z1:[0,0.55], Z2:[0.56,0.75], Z3:[0.76,0.90], Z4:[0.91,1.05], Z5:[1.06,1.20], Z6:[1.21,1.50], Z7:[1.51,2.0] };
@@ -289,10 +290,12 @@ function genRun(phase, wiRaw, rec, rp, key, dist) {
 }
 
 /* ---------------- plan builder ---------------- */
-function buildPlan(raceDateStr, dist) {
+function buildPlan(raceDateStr, dist, startStr) {
   const race = new Date(raceDateStr + "T00:00:00");
   if (isNaN(race)) return null;
-  const start = mondayOfThisWeek();
+  let start;
+  if (startStr) { const d = new Date(startStr + "T00:00:00"); d.setDate(d.getDate() - ((d.getDay()+6)%7)); start = isNaN(d) ? mondayOfThisWeek() : d; }
+  else start = mondayOfThisWeek();
   const days = Math.round((race - start) / 864e5);
   if (days < 21) return { error: "距比賽不足3週,建議直接進入減量與恢復。" };
   const n = Math.min(40, Math.floor(days / 7) + 1);
@@ -322,7 +325,7 @@ function buildPlan(raceDateStr, dist) {
 
 /* ---------------- main ---------------- */
 export default function IronmanPlan() {
-  const [profile, setProfile] = useState({ height: 175, weight: 68, ftp: 250, tpace: "1:35", hm: "1:32", dist: "226", raceDate: "2026-11-08", lastSwim: "", lastBike: "", lastRun: "", goal: "", adjS: 0, adjB: 0, adjR: 0 });
+  const [profile, setProfile] = useState({ height: 175, weight: 68, ftp: 250, tpace: "1:35", hm: "1:32", dist: "226", raceDate: "2026-11-08", startDate: "", lastSwim: "", lastBike: "", lastRun: "", goal: "", adjS: 0, adjB: 0, adjR: 0 });
   const [editing, setEditing] = useState(true);
   const [selected, setSelected] = useState(1);
   const [expanded, setExpanded] = useState(null);
@@ -331,11 +334,16 @@ export default function IronmanPlan() {
     (async () => {
       try {
         const p = await storage.get("athlete:profile", false);
-        if (p && p.value) { setProfile((d) => ({ ...d, ...JSON.parse(p.value) })); setEditing(false); }
+        if (p && p.value) {
+          const loaded = JSON.parse(p.value);
+          if (!loaded.startDate) { loaded.startDate = isoOfMonday(mondayOfThisWeek());  }
+          setProfile((d) => ({ ...d, ...loaded })); setEditing(false);
+        } else { setProfile((d) => ({ ...d, startDate: isoOfMonday(mondayOfThisWeek()) })); }
       } catch (e) {}
     })();
   }, []);
   useEffect(() => { setExpanded(null); }, [selected]);
+  const [autoJumped, setAutoJumped] = useState(false);
 
   async function saveProfile(next) {
     setProfile(next);
@@ -343,7 +351,7 @@ export default function IronmanPlan() {
   }
 
   const dist = { id: profile.dist || "226", ...DISTS[profile.dist || "226"] };
-  const plan = useMemo(() => buildPlan(profile.raceDate, dist), [profile.raceDate, profile.dist]);
+  const plan = useMemo(() => buildPlan(profile.raceDate, dist, profile.startDate), [profile.raceDate, profile.dist, profile.startDate]);
   const rp = runPaces(profile.hm, dist);
   const tpaceSec = parseMS(profile.tpace);
   const now = new Date();
@@ -357,6 +365,11 @@ export default function IronmanPlan() {
   }
 
   const { weeks, n: N, start } = plan;
+  if (!autoJumped) {
+    const cur = Math.floor((mondayOfThisWeek() - start) / (7*864e5)) + 1;
+    if (cur >= 1 && cur <= N && cur !== selected) { setSelected(cur); }
+    setAutoJumped(true);
+  }
   const sel = Math.min(selected, N);
   const week = weeks.find((w) => w.n === sel);
   const phase = PHASES[week.phase];
@@ -499,6 +512,7 @@ function Shell({ profile, editing, setEditing, saveProfile, rp, raceInfo, childr
                 </div>
               </Field>
               <Field label="比賽日期"><input type="date" value={profile.raceDate} onChange={(e) => saveProfile({ ...profile, raceDate:e.target.value })} /></Field>
+              <Field label="計畫起始日（換裝置請填同一天）"><input type="date" value={profile.startDate || ""} onChange={(e) => saveProfile({ ...profile, startDate:e.target.value })} /></Field>
               <Field label="半馬PB h:mm"><input type="text" placeholder="1:32" value={profile.hm} onChange={(e) => saveProfile({ ...profile, hm:e.target.value })} /></Field>
               <Field label="FTP (W)"><input type="number" value={profile.ftp} onChange={(e) => saveProfile({ ...profile, ftp:+e.target.value })} /></Field>
               <Field label="游泳T-pace mm:ss"><input type="text" placeholder="1:35" value={profile.tpace} onChange={(e) => saveProfile({ ...profile, tpace:e.target.value })} /></Field>

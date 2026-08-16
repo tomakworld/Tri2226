@@ -13,6 +13,7 @@ const DAY_OFFSET = { mon:0,tue:1,wed:2,thu:3,fri:4,sat:5,sun:6 };
 const DAY_LABEL = { mon:"一",tue:"二",wed:"三",thu:"四",fri:"五",sat:"六",sun:"日" };
 function mondayOfThisWeek(){ const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d; }
 function fmtD(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
+function isoOfMonday(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function parseT(str){ // 支援 mm:ss 或 h:mm:ss
   const m3=/^(\d+):(\d{1,2}):(\d{1,2})$/.exec((str||"").trim());
   if (m3) return (+m3[1])*3600+(+m3[2])*60+(+m3[3]);
@@ -92,10 +93,12 @@ function mileage(phase, wi, rec){
 }
 
 /* ---- plan builder ---- */
-function buildPlan(raceDateStr){
+function buildPlan(raceDateStr, startStr){
   const race = new Date(raceDateStr+"T00:00:00");
   if (isNaN(race)) return null;
-  const start = mondayOfThisWeek();
+  let start;
+  if (startStr) { const d = new Date(startStr+"T00:00:00"); if (!isNaN(d)) { d.setDate(d.getDate()-((d.getDay()+6)%7)); start = d; } }
+  if (!start) start = mondayOfThisWeek();
   const days = Math.round((race-start)/864e5);
   if (days < 42) return { error:"距比賽不足6週,Sub-3週期化至少建議12週以上。" };
   const n = Math.min(26, Math.floor(days/7)+1);
@@ -123,7 +126,7 @@ const PHASE_META = {
 /* ================= UI ================= */
 export default function Sub3Plan(){
   const [profile, setProfile] = useState({
-    raceDate:"2026-12-20", k3:"", k5:"19:30", k10:"40:30", hm:"1:29:00", fm:"3:08:00",
+    raceDate:"2026-12-20", startDate:"", k3:"", k5:"19:30", k10:"40:30", hm:"1:29:00", fm:"3:08:00",
     height:172, weight:62, sex:"M", rhr:48,
   });
   const [editing, setEditing] = useState(true);
@@ -131,8 +134,11 @@ export default function Sub3Plan(){
   const [expanded, setExpanded] = useState(null);
   useEffect(()=>{ (async()=>{
     try {
-      if (window.storage){ const p = await window.storage.get("sub3:profile", false); if (p&&p.value){ setProfile(d=>({...d,...JSON.parse(p.value)})); setEditing(false);} }
-      else { const v = localStorage.getItem("sub3:profile"); if (v){ setProfile(d=>({...d,...JSON.parse(v)})); setEditing(false);} }
+      let raw = null;
+      if (window.storage){ const p = await window.storage.get("sub3:profile", false); raw = p && p.value; }
+      else raw = localStorage.getItem("sub3:profile");
+      if (raw){ const L = JSON.parse(raw); if (!L.startDate) L.startDate = isoOfMonday(mondayOfThisWeek()); setProfile(d=>({...d,...L})); setEditing(false); }
+      else setProfile(d=>({...d, startDate: isoOfMonday(mondayOfThisWeek())}));
     } catch(e){}
   })(); }, []);
   useEffect(()=>{ setExpanded(null); }, [sel]);
@@ -162,7 +168,7 @@ export default function Sub3Plan(){
   }, [profile.k3, profile.k5, profile.k10, profile.hm, profile.fm]);
 
   const P = V ? danielsPaces(V.vdot) : null;
-  const plan = useMemo(()=>buildPlan(profile.raceDate), [profile.raceDate]);
+  const plan = useMemo(()=>buildPlan(profile.raceDate, profile.startDate), [profile.raceDate, profile.startDate]);
   const now = new Date();
 
   const gapV = V ? (SUB3_VDOT - V.vdot) : null;
@@ -198,6 +204,7 @@ export default function Sub3Plan(){
               <Field label="半馬"><input value={profile.hm} placeholder="1:29:00" onChange={e=>save({...profile,hm:e.target.value})}/></Field>
               <Field label="全馬"><input value={profile.fm} placeholder="3:08:00" onChange={e=>save({...profile,fm:e.target.value})}/></Field>
               <Field label="比賽日期"><input type="date" value={profile.raceDate} onChange={e=>save({...profile,raceDate:e.target.value})}/></Field>
+              <Field label="計畫起始日(換裝置填同一天)"><input type="date" value={profile.startDate||""} onChange={e=>save({...profile,startDate:e.target.value})}/></Field>
             </div>
             <div style={{ fontSize:10.5, color:C.gold, fontWeight:700, margin:"12px 0 6px" }}>② 身體數據(監控用,不影響配速)</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:10 }}>
@@ -257,6 +264,10 @@ export default function Sub3Plan(){
 
 function PlanView({ plan, P, profile, sel, setSel, expanded, setExpanded, now }){
   const { weeks, n:N, start } = plan;
+  useEffect(()=>{
+    const cur = Math.floor((mondayOfThisWeek()-start)/(7*864e5))+1;
+    if (cur>=1 && cur<=N) setSel(cur);
+  }, [start, N]);
   const s2 = Math.min(sel, N);
   const week = weeks.find(w=>w.n===s2);
   const meta = PHASE_META[week.phase];
