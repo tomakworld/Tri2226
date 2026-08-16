@@ -56,7 +56,18 @@ const Z = {
   Z4:`Z4 ${W(0.91)}-${W(1.05)}W`, SS:`SS ${W(0.90)}-${W(0.93)}W(上半區)`,
 };
 
-/* ---- 跑步:自主課表(全馬3:20 → 226配速 5:19-5:39/km) ---- */
+/* ---- 跑步課表(教練提供,依階段微調;排程已與騎車課協調) ---- */
+function runPlan(){
+  return {
+    wed:{t:"間歇", x:"200m x20 @43秒 漸速跑,跑休200m/90秒", v:"20x200m"},
+    thu:{t:"配速跑", x:"10-12km @5:00 漸速跑", v:"10-12km"},
+    fri:{t:"慢跑", x:"慢跑", v:"慢跑"},
+    sat:{t:"間歇", x:"1200m x5 @4:36 休5分", v:"5x1200m"},
+    sun:{t:"長跑", x:"16-20km", v:"16-20km"},
+  };
+}
+
+/* ---- (舊)跑步:自主課表(全馬3:20 → 226配速 5:19-5:39/km) ---- */
 function runOf(phase, sunKm, rec){
   const fri = phase==="base"||phase==="build1"
     ? "1000m ×5-6 @3:45 休5分"
@@ -87,7 +98,7 @@ function gen(phase, wi, rec){
     }, bike:{
       wed:{t:"Z2+Tempo收尾", x:`${bw}分 ${Z.Z2},最後15分 ${Z.Z3};跑步間歇在前,間隔4小時+`, v:`${bw}分`, tss:tss([[bw-15,0.65],[15,0.83]])},
       thu:{t:"閾值間歇", x:`熱身15分;主課 4x${bte}分 ${Z.Z3}上緣~${Z.Z4}下緣(恢復力佳:可取中段93-95%FTP即${W(0.93)}-${W(0.95)}W,務必開風扇);息4分;緩和10分`, v:`${15+4*bte+16+10}分`, tss:tss([[15,0.6],[4*bte,0.88],[16,0.5],[10,0.55]])},
-      sat:{t:"長騎有氧", x:`${Z.Z2},室內${r5(bs*0.85)}分/戶外${bs}分;每20分補水+電解質;室內分段:每45分變化一次(平地Z2→8分低迴轉65rpm→5分站姿→2分高迴轉110rpm);【續航力】最後30分補 2x8分 ${W(0.75)}-${W(0.80)}W`, v:`${bs}分`, tss:tss([[bs-30,0.65],[16,0.78],[14,0.6]])},
+      sat:{t:"長騎有氧", x:`${Z.Z2},室內${r5(bs*0.85)}分/戶外${bs}分;每20分補水+電解質;室內分段:每45分變化一次(平地Z2→8分低迴轉65rpm→5分站姿→2分高迴轉110rpm);中途下車補給/如廁後,上車前5分刻意用比賽功率重回節奏(比賽日也會遇到);【續航力】最後30分補 2x8分 ${W(0.75)}-${W(0.80)}W`, v:`${bs}分`, tss:tss([[bs-30,0.65],[16,0.78],[14,0.6]])},
     }};
   }
   if (phase==="build1"){
@@ -102,7 +113,7 @@ function gen(phase, wi, rec){
     }, bike:{
       wed:{t:"Z2+Sweet Spot", x:`${bw}分 ${Z.Z2},中段2x15分 ${Z.SS};跑步間歇後4小時+`, v:`${bw}分`, tss:tss([[bw-30,0.65],[30,0.90]])},
       thu:{t:"FTP強化", x:`熱身15分;主課 3x${bte}分 ${Z.Z4}(室內${W(0.91)}W起);息5分;緩和10分`, v:`${15+3*bte+15+10}分`, tss:tss([[15,0.6],[3*bte,0.92],[15,0.5],[10,0.55]])},
-      sat:{t:"長距耐力", x:`${Z.Z2},室內${r5(bs*0.85)}分/戶外${bs}分;每45分變化一次(低迴轉/站姿/高迴轉輪替),每小時起身1分;刻意練習空力姿勢維持;【續航力關鍵】最後45分補 3x10分 比賽功率${W(0.68)}-${W(0.72)}W(疲勞下才練得到的東西)`, v:`${bs}分`, tss:tss([[bs-45,0.66],[30,0.70],[15,0.6]])},
+      sat:{t:"長距耐力", x:`${Z.Z2},室內${r5(bs*0.85)}分/戶外${bs}分;每45分變化一次(低迴轉/站姿/高迴轉輪替),每小時起身1分;刻意練習空力姿勢維持;【續航力關鍵】最後45分補 3x10分 比賽功率${W(0.68)}-${W(0.72)}W,可依當日狀況彈性:守比賽功率(練續航力)或拉到Z3(練疲勞下的強度耐受),兩者交替使用`, v:`${bs}分`, tss:tss([[bs-45,0.66],[30,0.70],[15,0.6]])},
     }};
   }
   if (phase==="build2"){
@@ -118,7 +129,7 @@ function gen(phase, wi, rec){
     }, bike:{
       wed:{t:"Z2+Sweet Spot", x:`${bw}分 ${Z.Z2},中段2x18分 ${Z.SS};跑步間歇後4小時+`, v:`${bw}分`, tss:tss([[bw-36,0.65],[36,0.90]])},
       thu:{t:"FTP高峰", x:`熱身15分;主課 3x${bte}分 ${Z.Z4} 下緣;息5分;緩和10分`, v:`${15+3*bte+15+10}分`, tss:tss([[15,0.6],[3*bte,0.93],[15,0.5],[10,0.55]])},
-      sat:{t: brick?"長距+Brick":"長距耐力", x:`${Z.Z2}為主,室內${r5(bs*0.85)}分/戶外${bs}分,每小時起身1分;【續航力關鍵】最後60分補 4x10分 比賽功率${W(0.68)}-${W(0.72)}W,組間5分Z2 — 這是全課最重要的段落,累了還要守住輸出${brick?";下車再接20分超鐵配速跑(5:35-6:00)":""}`, v:`${bs}分`, tss:tss([[bs-60,0.67],[40,0.70],[20,0.6]])},
+      sat:{t: brick?"長距+Brick":"長距耐力", x:`【本階段至少安排2次戶外】室內練不到坐墊耐受/實路操控/邊騎邊補給,${Z.Z2}為主,室內${r5(bs*0.85)}分/戶外${bs}分,每小時起身1分;【續航力關鍵】最後60分補 4x10分 比賽功率${W(0.68)}-${W(0.72)}W,組間5分Z2;比賽功率版練續航力、Z3版練疲勞下強度耐受,建議交替安排,越接近賽期越偏向比賽功率${brick?";下車再接20分超鐵配速跑(5:35-6:00)":""}`, v:`${bs}分`, tss:tss([[bs-60,0.67],[40,0.70],[20,0.6]])},
     }};
   }
   if (phase==="peak"){
@@ -227,6 +238,8 @@ export default function SeasonPlan(){
 
   const mk = (icon,color,o,idp) => ({ id:idp, color, icon, title:o.t, vol:o.v, detail:o.x });
   const runLabel = { wed:"間歇", thu:"慢跑", fri:"品質課", sat:"慢跑", sun:"長跑" };
+  const RP = week.race ? null : runPlan();
+
   const rows = week.race ? [] : [
     { day:"mon", items:[{rest:true}] },
     { day:"tue", items:[ mk(<Dumbbell size={13}/>,C.iron,{t:"重量訓練",v:"",x:STRENGTH[week.phase]},"tue-s"), mk(<Waves size={13}/>,C.water,week.swim.tue,"tue-sw") ] },
@@ -301,7 +314,7 @@ export default function SeasonPlan(){
 
         {!week.race && (
           <div style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:10, padding:"8px 11px", marginBottom:10, fontSize:11, lineHeight:1.55, color:C.muted }}>
-            <b style={{ color:C.water }}>續航力監控</b>：長騎後看 TrainingPeaks 的 <span className="mono">Pw:HR</span> 脫鉤值 — 低於5%代表效率守住了,超過5-10%代表後段撐不住(通常是補水/補糖不足或有氧底子還要堆)。同一種課隔幾週比較這個數字變小,就是續航力進步的直接證據。
+            <b style={{ color:C.water }}>室內長課三要件</b>：①散熱 — 兩台風扇(上身+腿)、室溫≤24°C、每20分補水;8月實測第2-3小時掉10W多為熱負荷所致 ②補給 — 每小時碳水60-70g,長課前後量體重,掉超過2%代表補水不足 ③監控 — 記錄脫鉤值(目標<5%)與分段EF,同心率下功率提升即為進步。
           </div>
         )}
         {week.race ? <RaceWeek/> : (
@@ -321,14 +334,25 @@ export default function SeasonPlan(){
                       if (it.rest) return <div key={ii} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:C.muted, padding:"4px 2px" }}><Moon size={12}/> 全休</div>;
                       if (it.run) {
                         const key = `${week.n}:${it.run}`;
+                        const rp2 = RP[it.run];
+                        const open2 = expanded===`run-${it.run}`;
                         return (
-                          <div key={ii} style={{ display:"flex", alignItems:"center", gap:6 }}>
-                            <span style={{ display:"flex", alignItems:"center", gap:3, fontSize:11, color:RC[it.run], flexShrink:0, width:56 }}>
-                              <Footprints size={12}/>{runLabel[it.run]}
-                            </span>
-                            <input value={runNotes[key]||""} onChange={(e)=>onRun(week.n, it.run, e.target.value)} placeholder="填入自主跑步課表…"
-                              style={{ flex:1, minWidth:0, background:"transparent", border:"none", borderBottom:`1px dashed ${C.line}`, borderRadius:0, padding:"2px 4px", fontFamily:"'Inter',sans-serif", fontSize:12.5, color:C.text, outline:"none" }} />
-                            <span style={{ width:14, flexShrink:0, fontSize:10, color:C.green }}>{savedKey===key?"✓":""}</span>
+                          <div key={ii}>
+                            <button className="rowbtn" onClick={()=>setExpanded(open2?null:`run-${it.run}`)}
+                              style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"transparent", border:"none", color:C.text, cursor:"pointer", padding:"3px 2px", textAlign:"left", borderRadius:6 }}>
+                              <span style={{ color:RC[it.run], display:"flex", flexShrink:0 }}><Footprints size={13}/></span>
+                              <span style={{ fontSize:12.5, fontWeight:600, flexShrink:0 }}>跑·{rp2.t}</span>
+                              <span className="mono" style={{ fontSize:10.5, color:RC[it.run], marginLeft:"auto", flexShrink:0 }}>{rp2.v}</span>
+                              <ChevronDown size={13} color={C.muted} style={{ flexShrink:0, transform:open2?"rotate(180deg)":"none", transition:"transform .15s" }}/>
+                            </button>
+                            {open2 && (
+                              <div style={{ fontSize:12, opacity:0.85, lineHeight:1.6, padding:"2px 4px 6px 21px", borderLeft:`2px solid ${RC[it.run]}`, marginLeft:5, marginTop:2 }}>
+                                {rp2.x}
+                                <input value={runNotes[key]||""} onChange={(e)=>onRun(week.n, it.run, e.target.value)} placeholder="實際完成記錄/備註…"
+                                  style={{ width:"100%", marginTop:5, background:"transparent", border:"none", borderBottom:`1px dashed ${C.line}`, borderRadius:0, padding:"2px 0", fontFamily:"'Inter',sans-serif", fontSize:12, color:C.text, outline:"none" }} />
+                                <span style={{ fontSize:10, color:C.green }}>{savedKey===key?"✓ 已儲存":""}</span>
+                              </div>
+                            )}
                           </div>
                         );
                       }
