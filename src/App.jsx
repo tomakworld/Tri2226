@@ -238,9 +238,9 @@ function genRun(phase, wiRaw, rec, rp, key, dist) {
   if (phase === "base") {
     const lk = Math.round((rec ? 14 : 16 + wi*2)*kk);
     return {
-      wed:{ t:"間歇", x:`熱身2km;${rec?6:8+wi}x400m @${itv}${rp?REP(400,rp.itv[0],rp.itv[1]):""} 慢跑200m恢復;緩和1km`, v:`${rec?6:8+wi}x400m` },
+      wed:{ t:"間歇", x:`熱身2km;${rec?6:8+wi}x400m ${rp?`目標 ${secStr(rp.itv[0]*0.4)}-${secStr(rp.itv[1]*0.4)}/趟`:"間歇強度"} 慢跑200m恢復;緩和1km`, v:`${rec?6:8+wi}x400m` },
       thu: easyRun,
-      fri:{ t:"速度節奏", x:`熱身2km;${rec?6:10}x300m @${itv}${rp?REP(300,rp.itv[0],rp.itv[1]):""} +100m慢;緩和1km`, v:`${rec?6:10}x300m` },
+      fri:{ t:"速度節奏", x:`熱身2km;${rec?6:10}x300m ${rp?`目標 ${secStr(rp.itv[0]*0.3)}-${secStr(rp.itv[1]*0.3)}/趟`:"間歇強度"} +100m慢;緩和1km`, v:`${rec?6:10}x300m` },
       sat: easyRun,
       sun:{ t:"長跑", x:`${lk}km:前2/3 @${lng} 漸速至 ${mp},末1/3 @${im} 練節奏轉換`, v:`${lk}km` },
     };
@@ -248,7 +248,7 @@ function genRun(phase, wiRaw, rec, rp, key, dist) {
   if (phase === "build1") {
     const lk = Math.round((rec ? 16 : 21 + wi*2)*kk);
     return {
-      wed:{ t:"間歇", x:`熱身2km;${rec?3:5}x1000m @${thr}${rp?REP(1000,rp.thr):""} 休2分;緩和1km`, v:`${rec?3:5}x1000m` },
+      wed:{ t:"間歇", x:`熱身2km;${rec?3:5}x1000m ${rp?`目標 ${secStr(rp.thr)}/趟`:"閾值"} 休2分;緩和1km`, v:`${rec?3:5}x1000m` },
       thu: easyRun,
       fri:{ t:"節奏跑", x:`熱身2km;${rec?15:20+wi*5}分連續 @${thr};緩和1km`, v:`${rec?15:20+wi*5}分` },
       sat: easyRun,
@@ -258,7 +258,7 @@ function genRun(phase, wiRaw, rec, rp, key, dist) {
   if (phase === "build2") {
     const lk = Math.min(Math.round((rec ? 18 : 24 + wi*2)*kk), capLong);
     return {
-      wed:{ t:"巡航間歇", x:`熱身2km;${rec?2:3}x2000m @${thr}${rp?REP(2000,rp.thr):""} 休90秒;緩和1km`, v:`${rec?2:3}x2km` },
+      wed:{ t:"巡航間歇", x:`熱身2km;${rec?2:3}x2000m ${rp?`目標 ${secStr(rp.thr*2)}/趟`:"閾值"} 休90秒;緩和1km`, v:`${rec?2:3}x2km` },
       thu: easyRun,
       fri:{ t:"配速跑", x:`熱身2km;${rec?8:10+wi}km @${mp};緩和1km`, v:`${rec?8:10+wi}km` },
       sat: easyRun,
@@ -267,14 +267,14 @@ function genRun(phase, wiRaw, rec, rp, key, dist) {
   }
   if (phase === "peak") {
     if (key) return {
-      wed:{ t:"配速維持", x:`熱身2km;2x3km @${mp}${rp?REP(3000,rp.mp):""} 休2分;緩和1km`, v:"2x3km" },
+      wed:{ t:"配速維持", x:`熱身2km;2x3km ${rp?`目標 ${secStr(rp.mp*3)}/趟`:"全馬配速"} 休2分;緩和1km`, v:"2x3km" },
       thu: easyRun,
       fri:{ t:"226配速", x:`熱身1km;6km @${im};緩和1km`, v:"6km" },
       sat: easyRun,
       sun:{ t:"短長跑", x:`昨日負荷大,僅14km @${easy}`, v:"14km" },
     };
     return {
-      wed:{ t:"配速維持", x:`熱身2km;2x3km @${mp}${rp?REP(3000,rp.mp):""} 休2分+4x100m加速;緩和1km`, v:"2x3km" },
+      wed:{ t:"配速維持", x:`熱身2km;2x3km ${rp?`目標 ${secStr(rp.mp*3)}/趟`:"全馬配速"} 休2分+4x100m加速;緩和1km`, v:"2x3km" },
       thu: easyRun,
       fri:{ t:"226配速", x:`熱身1km;8-10km @${im},末2km提至 ${mp};緩和1km`, v:"8-10km" },
       sat: easyRun,
@@ -283,7 +283,7 @@ function genRun(phase, wiRaw, rec, rp, key, dist) {
   }
   const last = wi >= 2;
   return {
-    wed:{ t:"神經喚醒", x:`熱身2km;${last?4:6}x200m @${itv}${rp?REP(200,rp.itv[0],rp.itv[1]):""};緩和1km`, v:`${last?4:6}x200m` },
+    wed:{ t:"神經喚醒", x:`熱身2km;${last?4:6}x200m ${rp?`目標 ${secStr(rp.itv[0]*0.2)}-${secStr(rp.itv[1]*0.2)}/趟`:"輕快"};緩和1km`, v:`${last?4:6}x200m` },
     thu:{ t:"輕鬆跑", x:`${last?20:30}分 @${easy}`, v:`${last?20:30}分` },
     fri:{ t:"開合跑", x:`熱身1km;${last?3:4}km @${im};緩和1km`, v:`${last?3:4}km` },
     sat:{ t:"輕鬆跑", x:`20-30分 @${easy}+4x60m加速`, v:"20-30分" },

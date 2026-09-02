@@ -56,8 +56,11 @@ const STRENGTH = {
 };
 
 /* ---- Q課庫(依 Daniels Phase I-IV) ---- */
-function qOf(phase, wi, rec, P){
+function qOf(phase, wiRaw, rec, P){
+  const wi = Math.min(wiRaw, 5);
   const E=`${paceStr(P.eLo)}-${paceStr(P.eHi)}`, M=paceStr(P.m), T=paceStr(P.t), I=paceStr(P.i), R=paceStr(P.r);
+  const secStr=(t)=> t>=60 ? `${Math.floor(t/60)}:${String(Math.round(t%60)).padStart(2,"0")}` : `${Math.round(t)}秒`;
+  const REP=(m,pace)=>`(每趟 ${secStr(pace*m/1000)})`;
   const rf = rec ? "(減量:7成)" : "";
   if (phase==="p1") return {
     q1:{ t:"Q1·坡度+R刺激", x:`E跑40-50分 @${E},其中插入8x20秒短坡衝或平地加速,回走完全恢復(長休息,純神經刺激不求乳酸);建立神經基礎${rf}`, v:"50分" },
@@ -65,28 +68,29 @@ function qOf(phase, wi, rec, P){
     lg:{ km: rec?20 : 22+wi*2, note:`全程 E @${E},最後15分可至 M @${M}` },
   };
   if (phase==="p2") return {
-    q1:{ t:"Q1·I 間歇", x:`熱身3km;${rec?4:5+Math.min(wi,2)}x1000m @${I} 慢跑2-3分恢復(約1:0.8短休息,練VO2max與乳酸排除);緩和2km${rf} — I總量上限為週跑量8%,單堂不超過10km`, v:`${rec?4:5+Math.min(wi,2)}x1000` },
-    q2:{ t:"Q2·R 速度", x:`熱身3km;${rec?6:8}x400m @${R} 完全恢復慢跑400m(約1:2長休息,練最高速度與神經徵召,務必休滿);緩和2km${rf}`, v:`${rec?6:8}x400` },
-    lg:{ km: rec?24 : 26+wi*2, note:`E @${E},中段插入2x3km @${M};90分以上開始練補給,每45分一次` },
+    q1:{ t:"Q1·I 間歇", x:`熱身3km;${rec?4:5+Math.min(wi,2)}x1000m 目標 ${secStr(P.i)}/趟 慢跑2-3分恢復(約1:0.8短休息,練VO2max與乳酸排除);緩和2km${rf} — I總量上限為週跑量8%,單堂不超過10km`, v:`${rec?4:5+Math.min(wi,2)}x1000` },
+    q2:{ t:"Q2·R 速度", x:`熱身3km;${rec?6:8}x400m 目標 ${secStr(P.r*0.4)}/趟 完全恢復慢跑400m(約1:2長休息,練最高速度與神經徵召,務必休滿);緩和2km${rf}`, v:`${rec?6:8}x400` },
+    lg:{ km: rec?24 : 26+wi*2, note:`E @${E},中段插入2x3km 目標 ${secStr(P.m*3)}/趟;90分以上開始練補給,每45分一次` },
   };
   if (phase==="p3") return {
-    q1:{ t:"Q1·T巡航+I", x:`熱身3km;2x3km @${T} 休2分(6:1) + 3x1000m @${I} 休2分(1:0.6);緩和2km${rf}`, v:"T+I混合" },
-    q2:{ t:"Q2·M配速", x:`熱身2km;${rec?8:10+wi*2}km 連續 @${M};收尾4x200m @${R}(維持跑步經濟性);緩和1km${rf}`, v:`${rec?8:10+wi*2}km@M` },
+    q1:{ t:"Q1·T巡航+I", x:`熱身3km;2x3km 目標 ${secStr(P.t*3)}/趟 休2分(6:1) + 3x1000m 目標 ${secStr(P.i)}/趟 休2分(1:0.6);緩和2km${rf}`, v:"T+I混合" },
+    q2:{ t:"Q2·M配速", x:`熱身2km;${rec?8:10+wi*2}km 連續 @${M};收尾4x200m 目標 ${secStr(P.r*0.2)}/趟(維持跑步經濟性);緩和1km${rf}`, v:`${rec?8:10+wi*2}km@M` },
     lg:{ km: Math.min(rec?26 : 28+wi*2, 32), note:`前段 E @${E},末${rec?6:10}km @${M} — Sub-3專項課;上限2.5小時,超時就停(時間比距離重要);每40分補給一次,演練比賽用膠` },
   };
   if (phase==="p4") return {
     q1:{ t:"Q1·T鞏固", x:`熱身3km;2x20分 T @${T} 休4分(5:1極短休息,擴大有氧天花板);緩和2km${rf} — T總量以不超過週跑量10%為原則,若當週量偏低改為2x15分`, v:"2x20分T" },
-    q2:{ t:"Q2·M專項", x:`熱身2km;${rec?10:14}km @${M},鎖定目標節奏;收尾4x200m @${R};緩和1km${rf}`, v:`${rec?10:14}km@M` },
-    lg:{ km: rec?24 : 28, note:`E @${E} 含 3x3km @${M},演練比賽補給` },
+    q2:{ t:"Q2·M專項", x:`熱身2km;${rec?10:14}km @${M},鎖定目標節奏;收尾4x200m 目標 ${secStr(P.r*0.2)}/趟;緩和1km${rf}`, v:`${rec?10:14}km@M` },
+    lg:{ km: rec?24 : 28, note:`E @${E} 含 3x3km 目標 ${secStr(P.m*3)}/趟,演練比賽補給` },
   };
   if (phase==="taper") return {
-    q1:{ t:"Q1·敏銳", x:`熱身2km;${wi>=2?3:4}x1000m @${T} 休2分;緩和2km`, v:`${wi>=2?3:4}x1000T` },
+    q1:{ t:"Q1·敏銳", x:`熱身2km;${wi>=2?3:4}x1000m 目標 ${secStr(P.t)}/趟 休2分;緩和2km`, v:`${wi>=2?3:4}x1000T` },
     q2:{ t:"Q2·開合", x:`熱身2km;${wi>=2?4:6}km @${M};4x100m加速;緩和1km`, v:`${wi>=2?4:6}km@M` },
     lg:{ km: wi>=2?12:16, note:`E @${E},保持腿部記憶` },
   };
   return null;
 }
-function mileage(phase, wi, rec){
+function mileage(phase, wiRaw, rec){
+  const wi = Math.min(wiRaw, 4);
   const base = { p1:[60,75], p2:[75,85], p3:[85,95], p4:[75,82], taper:[45,55] }[phase] || [50,60];
   const k = rec ? 0.72 : 1;
   return Math.round((base[0] + (base[1]-base[0])*Math.min(wi/3,1)) * k / 5)*5;
@@ -101,7 +105,7 @@ function buildPlan(raceDateStr, startStr){
   if (!start) start = mondayOfThisWeek();
   const days = Math.round((race-start)/864e5);
   if (days < 42) return { error:"距比賽不足6週,Sub-3週期化至少建議12週以上。" };
-  const n = Math.min(26, Math.floor(days/7)+1);
+  const n = Math.min(40, Math.floor(days/7)+1);
   const taper = 2;
   const train = n-1-taper;
   const p1 = Math.max(2, Math.round(train*0.30));
