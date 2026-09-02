@@ -1,4 +1,3 @@
-import { storage } from "./storage.js";
 import React, { useState, useEffect, useMemo } from "react";
 import { Waves, Bike as BikeIcon, Footprints, Dumbbell, Moon, Settings2, ChevronLeft, ChevronRight, Flag, Sun, ChevronDown, Minus, Plus, RotateCcw } from "lucide-react";
 
@@ -118,7 +117,7 @@ function genSwimBike(phase, wiRaw, rec, dist) {
       sun:{t:"有氧耐力", x:`連續 ${d3}m {EN1};緩和200m`, v:`${d3+200}m`},
     }, bike:{
       wed:{t:"Z2+Tempo收尾", x:`${bw}分 {Z2},最後10分 {Z3};跑步間歇在前,間隔4小時+`, v:`${bw}分`, tss:tssCalc([[bw-10,0.65],[10,0.83]])},
-      thu:{t:"閾值間歇", x:`熱身15分;主課 ${btr}x${bte}分 {Z3}上緣~{Z4}下緣(室內取下緣,開風扇);息4分;緩和10分`, v:`${15+btr*bte+btr*4+10}分`, tss:tssCalc([[15,0.6],[btr*bte,0.88],[btr*4,0.5],[10,0.55]])},
+      thu:{t:"閾值間歇", x:`熱身15分;主課 ${btr}x${bte}分 {Z3}上緣~{Z4}下緣(室內取下緣,開風扇);息4分(短休息,練有氧天花板與乳酸排除);緩和10分`, v:`${15+btr*bte+btr*4+10}分`, tss:tssCalc([[15,0.6],[btr*bte,0.88],[btr*4,0.5],[10,0.55]])},
       sat:{t:"長騎有氧", x:`{Z2},${trainerLong(bs)};每20分補水+電解質`, v:`${bs}分`, tss:tssCalc([[bs,0.65]])},
     }};
   }
@@ -132,8 +131,8 @@ function genSwimBike(phase, wiRaw, rec, dist) {
       fri:{t:"長閾值", x:`熱身400m;主課 ${r2}x300m {THR} 息30秒;緩和200m`, v:`${400+r2*300+200}m`},
       sun:{t:"開放水域✕配速", x:`連續${d3}m,抬頭定位,後段比賽配速;緩和200m`, v:`${d3+200}m`},
     }, bike:{
-      wed:{t:"Z2+Sweet Spot", x:`${bw}分 {Z2},中段2x10分 Sweet Spot(88-93%FTP);跑步間歇後4小時+`, v:`${bw}分`, tss:tssCalc([[bw-20,0.65],[20,0.90]])},
-      thu:{t:"FTP強化", x:`熱身15分;主課 ${btr}x${bte}分 {Z4}(室內91%FTP起);息5分;緩和10分`, v:`${15+btr*bte+btr*5+10}分`, tss:tssCalc([[15,0.6],[btr*bte,0.92],[btr*5,0.5],[10,0.55]])},
+      wed:{t:"Z2+Sweet Spot", x:`${bw}分 {Z2},中段2x10分 Sweet Spot(88-93%FTP),組間休5分 Z2(2:1);跑步間歇後4小時+`, v:`${bw}分`, tss:tssCalc([[bw-20,0.65],[20,0.90]])},
+      thu:{t:"FTP強化", x:`熱身15分;主課 ${btr}x${bte}分 {Z4}(室內91%FTP起);息5分(短休息,約3:1);緩和10分`, v:`${15+btr*bte+btr*5+10}分`, tss:tssCalc([[15,0.6],[btr*bte,0.92],[btr*5,0.5],[10,0.55]])},
       sat:{t:"長距耐力", x:`{Z2},${trainerLong(bs)};鎖空力姿勢`, v:`${bs}分`, tss:tssCalc([[bs,0.67]])},
     }};
   }
@@ -148,8 +147,8 @@ function genSwimBike(phase, wiRaw, rec, dist) {
       fri:{t:"高強度閾值", x:`熱身400m;主課 ${r2}x300m {THR} 息30秒;緩和200m`, v:`${400+r2*300+200}m`},
       sun:{t:"長泳耐力", x:`連續${d3}m,模擬比賽節奏與補給;緩和200m`, v:`${d3+200}m`},
     }, bike:{
-      wed:{t:"Z2+Sweet Spot", x:`${bw}分 {Z2},中段2x12分 Sweet Spot(88-93%FTP);跑步間歇後4小時+`, v:`${bw}分`, tss:tssCalc([[bw-24,0.65],[24,0.90]])},
-      thu:{t:"FTP高峰", x:`熱身15分;主課 ${btr}x${bte}分 {Z4} 下緣;息5分;緩和10分`, v:`${15+btr*bte+btr*5+10}分`, tss:tssCalc([[15,0.6],[btr*bte,0.93],[btr*5,0.5],[10,0.55]])},
+      wed:{t:"Z2+Sweet Spot", x:`${bw}分 {Z2},中段2x12分 Sweet Spot(88-93%FTP),組間休5分 Z2(2.4:1);跑步間歇後4小時+`, v:`${bw}分`, tss:tssCalc([[bw-24,0.65],[24,0.90]])},
+      thu:{t:"FTP高峰", x:`熱身15分;主課 ${btr}x${bte}分 {Z4} 下緣;息5分(短休息,約3:1);緩和10分`, v:`${15+btr*bte+btr*5+10}分`, tss:tssCalc([[15,0.6],[btr*bte,0.93],[btr*5,0.5],[10,0.55]])},
       sat:{t: brick ? "長距+Brick" : "長距耐力", x:`{Z2}~{Z3},${trainerLong(bs)}${brick?";下車接20分226配速跑":""};建議部分戶外`, v:`${bs}分`, tss:tssCalc([[bs,0.70]])},
     }};
   }
@@ -160,7 +159,7 @@ function genSwimBike(phase, wiRaw, rec, dist) {
                  fri:{t:"高強度閾值", x:"熱身400m;主課 4x300m {THR} 息30秒;緩和200m", v:"1800m"},
                  sun:{t:"長泳✕配速", x:"連續1800m {EN1},後500m比賽配速;緩和200m", v:"2000m"} },
           bike:{ wed:{t:"Z2+Sweet Spot", x:"70分 {Z2},中段2x10分 Sweet Spot(88-93%FTP)", v:"70分", tss:60},
-                 thu:{t:"FTP高峰", x:"熱身15分;主課 2x20分 {Z4} 下緣;息5分;緩和10分", v:"90分", tss:82},
+                 thu:{t:"FTP高峰", x:"熱身15分;主課 2x20分 {Z4} 下緣;息5分(短休息,約3:1);緩和10分", v:"90分", tss:82},
                  sat:{t:"90km前哨+Brick", x:"比賽配速 {Z3}上緣;戶外160分/室內135分;下車接20分113配速跑", v:"2.7hr+20分", tss:158} } },
         { key:true,
           swim:{ tue:{t:"量能維持", x:"熱身400m;主課 4x200m {EN2} 息20秒;緩和200m", v:"1400m"},
@@ -173,7 +172,7 @@ function genSwimBike(phase, wiRaw, rec, dist) {
                  fri:{t:"閾值維持", x:"熱身400m;主課 3x250m {THR} 息25秒;緩和200m", v:"1350m"},
                  sun:{t:"中距收量", x:"連續1600m {EN1};緩和200m", v:"1800m"} },
           bike:{ wed:{t:"恢復迴轉", x:"40分 {Z1}~{Z2}", v:"40分", tss:22},
-                 thu:{t:"FTP維持", x:"熱身15分;主課 3x10分 {Z4};息4分;緩和10分", v:"65分", tss:58},
+                 thu:{t:"FTP維持", x:"熱身15分;主課 3x10分 {Z4};息4分(短休息,練有氧天花板與乳酸排除);緩和10分", v:"65分", tss:58},
                  sat:{t:"長騎收斂", x:"{Z2} 含20分比賽配速;室內105分/戶外120分", v:"2hr", tss:96} } },
       ];
       return T113[Math.min(wi-1, 2)];
@@ -182,21 +181,21 @@ function genSwimBike(phase, wiRaw, rec, dist) {
       { swim:{ tue:{t:"有氧維持", x:"熱身400m;技術6x50m;主課 6x200m {EN2} 息20秒;緩和200m", v:"2200m"},
                fri:{t:"高強度閾值", x:"熱身400m;主課 6x300m {THR} 息30秒;緩和200m", v:"2600m"},
                sun:{t:"長泳✕配速", x:"連續3200m {EN1},後1000m比賽配速;緩和200m", v:"3400m"} },
-        bike:{ wed:{t:"Z2+Sweet Spot", x:"90分 {Z2},中段2x12分 Sweet Spot(88-93%FTP)", v:"90分", tss:79},
-               thu:{t:"FTP高峰", x:"熱身15分;主課 3x20分 {Z4} 下緣;息5分;緩和10分", v:"110分", tss:105},
+        bike:{ wed:{t:"Z2+Sweet Spot", x:"90分 {Z2},中段2x12分 Sweet Spot(88-93%FTP),組間休5分 Z2", v:"90分", tss:79},
+               thu:{t:"FTP高峰", x:"熱身15分;主課 3x20分 {Z4} 下緣;息5分(短休息,約3:1);緩和10分", v:"110分", tss:105},
                sat:{t:"前哨長騎+Brick", x:"比賽配速 {Z3};戶外270分/室內230分;下車接30分226配速跑", v:"4.5hr+30分", tss:288} } },
       { key:true,
         swim:{ tue:{t:"量能維持", x:"熱身400m;技術6x50m;主課 5x200m {EN2} 息20秒;緩和200m", v:"2100m"},
                fri:{t:"高強度閾值", x:"熱身400m;主課 5x300m {THR} 息30秒;緩和200m", v:"2500m"},
                sun:{t:"🔑長泳關鍵", x:"連續3600m,全程比賽配速,完整演練補給;緩和200m", v:"3800m"} },
         bike:{ wed:{t:"恢復迴轉", x:"50分 {Z1}~{Z2}", v:"50分", tss:28},
-               thu:{t:"FTP高峰", x:"熱身15分;主課 2x28分 {Z4} 下緣;息8分;緩和10分", v:"105分", tss:99},
+               thu:{t:"FTP高峰", x:"熱身15分;主課 2x28分 {Z4} 下緣;息8分(較長休息,確保每組品質);緩和10分", v:"105分", tss:99},
                sat:{t:"🔑180km關鍵+Brick", x:"全程比賽配速 {Z3},務必戶外,300-330分;下車接40分226配速跑 — 最重單日", v:"5.5hr+40分", tss:335} } },
       { swim:{ tue:{t:"量能收斂", x:"熱身400m;主課 4x200m {EN2} 息20秒;緩和200m", v:"1800m"},
                fri:{t:"閾值維持", x:"熱身400m;主課 4x250m {THR} 息25秒;緩和200m", v:"1800m"},
                sun:{t:"中距收量", x:"連續2400m {EN1};緩和200m", v:"2600m"} },
         bike:{ wed:{t:"恢復迴轉", x:"45分 {Z1}~{Z2}", v:"45分", tss:24},
-               thu:{t:"FTP維持", x:"熱身15分;主課 3x12分 {Z4};息4分;緩和10分", v:"75分", tss:71},
+               thu:{t:"FTP維持", x:"熱身15分;主課 3x12分 {Z4};息4分(短休息,練有氧天花板與乳酸排除);緩和10分", v:"75分", tss:71},
                sat:{t:"長騎收斂", x:"{Z2} 含30分比賽配速;室內155分/戶外180分", v:"3hr", tss:142} } },
     ];
     return T[Math.min(wi-1, 2)];
@@ -333,7 +332,7 @@ export default function IronmanPlan() {
   useEffect(() => {
     (async () => {
       try {
-        const p = await storage.get("athlete:profile", false);
+        const p = await window.storage.get("athlete:profile", false);
         if (p && p.value) {
           const loaded = JSON.parse(p.value);
           if (!loaded.startDate) { loaded.startDate = isoOfMonday(mondayOfThisWeek());  }
@@ -354,7 +353,7 @@ export default function IronmanPlan() {
 
   async function saveProfile(next) {
     setProfile(next);
-    try { await storage.set("athlete:profile", JSON.stringify(next), false); } catch (e) {}
+    try { await window.storage.set("athlete:profile", JSON.stringify(next), false); } catch (e) {}
   }
 
   const dist = { id: profile.dist || "226", ...DISTS[profile.dist || "226"] };
