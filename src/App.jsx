@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Waves, Bike as BikeIcon, Footprints, Dumbbell, Moon, Settings2, ChevronLeft, ChevronRight, Flag, Sun, ChevronDown, Minus, Plus, RotateCcw } from "lucide-react";
+import { Waves, Bike as BikeIcon, Footprints, Dumbbell, Moon, Settings2, ChevronLeft, ChevronRight, Flag, Sun, ChevronDown, Minus, Plus, RotateCcw, Link2 } from "lucide-react";
 
 /* ---------------- light theme tokens ---------------- */
 const C = {
@@ -40,6 +40,12 @@ function mondayOfThisWeek() {
   return d;
 }
 function fmtDate(d) { return `${d.getMonth() + 1}/${d.getDate()}`; }
+function encodeProfile(p){
+  try { return btoa(encodeURIComponent(JSON.stringify(p))).replace(/=+$/,""); } catch(e){ return ""; }
+}
+function decodeProfile(str){
+  try { return JSON.parse(decodeURIComponent(atob(str))); } catch(e){ return null; }
+}
 function isoOfMonday(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
 /* ---------------- zone / pace math ---------------- */
@@ -345,6 +351,7 @@ export default function IronmanPlan() {
     })();
   }, []);
   useEffect(() => { setExpanded(null); }, [selected]);
+  const [copied, setCopied] = useState(false);
   const [autoJumped, setAutoJumped] = useState(false);
   const planForJump = useMemo(() => buildPlan(profile.raceDate, { id: profile.dist || "226", ...DISTS[profile.dist || "226"] }, profile.startDate), [profile.raceDate, profile.dist, profile.startDate]);
   useEffect(() => {
@@ -523,6 +530,19 @@ function Shell({ profile, editing, setEditing, saveProfile, rp, raceInfo, childr
               <Field label="體重 kg"><input type="number" value={profile.weight} onChange={(e) => saveProfile({ ...profile, weight:+e.target.value })} /></Field>
               <Field label="身高 cm"><input type="number" value={profile.height} onChange={(e) => saveProfile({ ...profile, height:+e.target.value })} /></Field>
               </div>
+            <div style={{ marginTop:12, display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+              <button onClick={() => {
+                const url = `${window.location.origin}${window.location.pathname}?d=${encodeProfile(profile)}${window.location.hash}`;
+                navigator.clipboard?.writeText(url).then(()=>setCopied(true)).catch(()=>{});
+                setTimeout(()=>setCopied(false), 2500);
+              }} style={{ background:C.water, border:"none", borderRadius:8, padding:"8px 14px", color:"#fff", fontSize:12.5, fontWeight:600, cursor:"pointer", display:"flex", gap:6, alignItems:"center" }}>
+                <Link2 size={14}/> 複製我的專屬連結
+              </button>
+              {copied && <span style={{ fontSize:11.5, color:C.green }}>✓ 已複製,存成書籤就不用再輸入資料</span>}
+            </div>
+            <div style={{ fontSize:10.5, color:C.muted, marginTop:4, lineHeight:1.5 }}>
+              手機瀏覽器可能會自動清除網站資料,建議複製連結後加入書籤或主畫面,換手機/換瀏覽器也能直接開啟同一份課表。
+            </div>
             <div style={{ fontSize:10.5, color:C.gold, fontWeight:700, margin:"12px 0 6px", letterSpacing:0.5 }}>② 拆分基準（僅影響目標拆分卡:有比賽成績優先採用,三項須齊全;未填則自動用①的PB預測）</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
               <Field label="上次比賽 游 h:mm"><input type="text" placeholder="1:25" value={profile.lastSwim} onChange={(e) => saveProfile({ ...profile, lastSwim:e.target.value })} /></Field>

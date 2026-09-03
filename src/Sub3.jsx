@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Footprints, Dumbbell, Moon, Settings2, ChevronLeft, ChevronRight, Flag, ChevronDown, Zap, HeartPulse } from "lucide-react";
+import { Footprints, Dumbbell, Moon, Settings2, ChevronLeft, ChevronRight, Flag, ChevronDown, Zap, HeartPulse, Link2 } from "lucide-react";
 
 /* ============ C版:Sub-3 全馬課表(Daniels VDOT體系) ============ */
 
@@ -13,6 +13,8 @@ const DAY_OFFSET = { mon:0,tue:1,wed:2,thu:3,fri:4,sat:5,sun:6 };
 const DAY_LABEL = { mon:"一",tue:"二",wed:"三",thu:"四",fri:"五",sat:"六",sun:"日" };
 function mondayOfThisWeek(){ const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d; }
 function fmtD(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
+function encodeProfile(p){ try { return btoa(encodeURIComponent(JSON.stringify(p))).replace(/=+$/,""); } catch(e){ return ""; } }
+function decodeProfile(str){ try { return JSON.parse(decodeURIComponent(atob(str))); } catch(e){ return null; } }
 function isoOfMonday(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function parseT(str){ // 支援 mm:ss 或 h:mm:ss
   const m3=/^(\d+):(\d{1,2}):(\d{1,2})$/.exec((str||"").trim());
@@ -134,10 +136,21 @@ export default function Sub3Plan(){
     height:172, weight:62, sex:"M", rhr:48,
   });
   const [editing, setEditing] = useState(true);
+  const [copied, setCopied] = useState(false);
   const [sel, setSel] = useState(1);
   const [expanded, setExpanded] = useState(null);
   useEffect(()=>{ (async()=>{
     try {
+      const urlD = new URLSearchParams(window.location.search).get("d");
+      if (urlD) {
+        const fromUrl = decodeProfile(urlD);
+        if (fromUrl) {
+          setProfile(d=>({...d, ...fromUrl})); setEditing(false);
+          try { if (window.storage) await window.storage.set("sub3:profile", JSON.stringify(fromUrl), false);
+                else localStorage.setItem("sub3:profile", JSON.stringify(fromUrl)); } catch(e){}
+          return;
+        }
+      }
       let raw = null;
       if (window.storage){ const p = await window.storage.get("sub3:profile", false); raw = p && p.value; }
       else raw = localStorage.getItem("sub3:profile");
@@ -209,6 +222,19 @@ export default function Sub3Plan(){
               <Field label="全馬"><input value={profile.fm} placeholder="3:08:00" onChange={e=>save({...profile,fm:e.target.value})}/></Field>
               <Field label="比賽日期"><input type="date" value={profile.raceDate} onChange={e=>save({...profile,raceDate:e.target.value})}/></Field>
               <Field label="計畫起始日(換裝置填同一天)"><input type="date" value={profile.startDate||""} onChange={e=>save({...profile,startDate:e.target.value})}/></Field>
+            </div>
+            <div style={{ marginTop:12, display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+              <button onClick={() => {
+                const url = `${window.location.origin}${window.location.pathname}?d=${encodeProfile(profile)}${window.location.hash}`;
+                navigator.clipboard?.writeText(url).then(()=>setCopied(true)).catch(()=>{});
+                setTimeout(()=>setCopied(false), 2500);
+              }} style={{ background:C.main, border:"none", borderRadius:8, padding:"8px 14px", color:"#fff", fontSize:12.5, fontWeight:600, cursor:"pointer", display:"flex", gap:6, alignItems:"center" }}>
+                <Link2 size={14}/> 複製我的專屬連結
+              </button>
+              {copied && <span style={{ fontSize:11.5, color:C.green }}>✓ 已複製,存成書籤就不用再輸入</span>}
+            </div>
+            <div style={{ fontSize:10.5, color:C.muted, marginTop:4, lineHeight:1.5 }}>
+              手機瀏覽器可能自動清除網站資料,建議複製連結加入書籤或主畫面。
             </div>
             <div style={{ fontSize:10.5, color:C.gold, fontWeight:700, margin:"12px 0 6px" }}>② 身體數據(監控用,不影響配速)</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:10 }}>
