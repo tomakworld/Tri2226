@@ -165,6 +165,10 @@ export default function Sub3Plan(){
       if (window.storage) await window.storage.set("sub3:profile", JSON.stringify(next), false);
       else localStorage.setItem("sub3:profile", JSON.stringify(next));
     } catch(e){}
+    try {
+      const enc = encodeProfile(next);
+      if (enc) window.history.replaceState(null, "", `${window.location.pathname}?d=${enc}${window.location.hash}`);
+    } catch(e){}
   }
 
   /* VDOT:各距離分別計算,取最高為訓練VDOT */

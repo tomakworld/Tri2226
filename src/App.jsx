@@ -363,6 +363,10 @@ export default function IronmanPlan() {
   async function saveProfile(next) {
     setProfile(next);
     try { await window.storage.set("athlete:profile", JSON.stringify(next), false); } catch (e) {}
+    try {
+      const enc = encodeProfile(next);
+      if (enc) window.history.replaceState(null, "", `${window.location.pathname}?d=${enc}${window.location.hash}`);
+    } catch (e) {}
   }
 
   const dist = { id: profile.dist || "226", ...DISTS[profile.dist || "226"] };
