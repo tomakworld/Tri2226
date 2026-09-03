@@ -1,3 +1,4 @@
+import { storage } from "./storage.js";
 import React, { useState, useEffect, useMemo } from "react";
 import { Footprints, Dumbbell, Moon, Settings2, ChevronLeft, ChevronRight, Flag, ChevronDown, Zap, HeartPulse, Link2 } from "lucide-react";
 
@@ -146,13 +147,13 @@ export default function Sub3Plan(){
         const fromUrl = decodeProfile(urlD);
         if (fromUrl) {
           setProfile(d=>({...d, ...fromUrl})); setEditing(false);
-          try { if (window.storage) await window.storage.set("sub3:profile", JSON.stringify(fromUrl), false);
+          try { if (true) await storage.set("sub3:profile", JSON.stringify(fromUrl), false);
                 else localStorage.setItem("sub3:profile", JSON.stringify(fromUrl)); } catch(e){}
           return;
         }
       }
       let raw = null;
-      if (window.storage){ const p = await window.storage.get("sub3:profile", false); raw = p && p.value; }
+      if (true){ const p = await storage.get("sub3:profile", false); raw = p && p.value; }
       else raw = localStorage.getItem("sub3:profile");
       if (raw){ const L = JSON.parse(raw); if (!L.startDate) L.startDate = isoOfMonday(mondayOfThisWeek()); setProfile(d=>({...d,...L})); setEditing(false); }
       else setProfile(d=>({...d, startDate: isoOfMonday(mondayOfThisWeek())}));
@@ -162,7 +163,7 @@ export default function Sub3Plan(){
   async function save(next){
     setProfile(next);
     try {
-      if (window.storage) await window.storage.set("sub3:profile", JSON.stringify(next), false);
+      if (true) await storage.set("sub3:profile", JSON.stringify(next), false);
       else localStorage.setItem("sub3:profile", JSON.stringify(next));
     } catch(e){}
     try {

@@ -1,3 +1,4 @@
+import { storage } from "./storage.js";
 import React, { useState, useEffect, useMemo } from "react";
 import { Waves, Bike as BikeIcon, Footprints, Dumbbell, Moon, Settings2, ChevronLeft, ChevronRight, Flag, Sun, ChevronDown, Minus, Plus, RotateCcw, Link2 } from "lucide-react";
 
@@ -341,7 +342,7 @@ export default function IronmanPlan() {
   useEffect(() => {
     (async () => {
       try {
-        const p = await window.storage.get("athlete:profile", false);
+        const p = await storage.get("athlete:profile", false);
         if (p && p.value) {
           const loaded = JSON.parse(p.value);
           if (!loaded.startDate) { loaded.startDate = isoOfMonday(mondayOfThisWeek());  }
@@ -362,7 +363,7 @@ export default function IronmanPlan() {
 
   async function saveProfile(next) {
     setProfile(next);
-    try { await window.storage.set("athlete:profile", JSON.stringify(next), false); } catch (e) {}
+    try { await storage.set("athlete:profile", JSON.stringify(next), false); } catch (e) {}
     try {
       const enc = encodeProfile(next);
       if (enc) window.history.replaceState(null, "", `${window.location.pathname}?d=${enc}${window.location.hash}`);
