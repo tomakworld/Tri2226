@@ -351,7 +351,6 @@ export default function IronmanPlan() {
     })();
   }, []);
   useEffect(() => { setExpanded(null); }, [selected]);
-  const [copied, setCopied] = useState(false);
   const [autoJumped, setAutoJumped] = useState(false);
   const planForJump = useMemo(() => buildPlan(profile.raceDate, { id: profile.dist || "226", ...DISTS[profile.dist || "226"] }, profile.startDate), [profile.raceDate, profile.dist, profile.startDate]);
   useEffect(() => {
@@ -486,6 +485,7 @@ export default function IronmanPlan() {
 
 /* ---------------- shell ---------------- */
 function Shell({ profile, editing, setEditing, saveProfile, rp, raceInfo, children }) {
+  const [copied, setCopied] = useState(false);
   return (
     <div style={{ minHeight: "100vh", background: C.ink, color: C.text, fontFamily: "'Inter',sans-serif" }}>
       <style>{`
