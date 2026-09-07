@@ -1,13 +1,20 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Waves, Bike as BikeIcon, Footprints, Dumbbell, Moon, ChevronLeft, ChevronRight, Flag, Sun, ChevronDown } from "lucide-react";
+/* 2026-09 adaptive baseline:
+   - FTP currently 203W.
+   - Recent long ride supplied by user: ~4h06 / 123km; steady endurance work supports current long-ride progression.
+   - Recent quality ride supplied by user includes progressive high-power work; use future TCX uploads to tune FTP/TTE.
+   - Strength training/recovery reported good; keep strength work, then reduce volume in Peak/Taper.
+   Coaching priority: raise bike ceiling + TTE, then convert it to 205km durability so the 50km run starts with lower residual fatigue.
+*/
 
 /* ============ Season 專屬 超長距離課表 (B版:游5k/騎205k/跑50k) ============
    身高160 / 體重50 / FTP 192W (3.84 W/kg) / 全馬 3:20
    比賽 2026-11-08 · 18週 · 游5000/騎205k/跑50k · 單車加強 · 跑步自主課表        */
 const FTP = 203, WEIGHT = 51;
 /* FTP:8/27實測20分平均210W(帶疲勞測),訓練基準採 203W
-   下次重測 W12(9/21那週),進入巔峰期前最後校準 */
-const FTP_TEST_WEEKS = { 12:"9/21當週(巔峰期前最後校準)" };
+   下次重測 W15(10/12那週),先完整完成W14 205km關鍵模擬;此為賽前最後一次FTP校準 */
+const FTP_TEST_WEEKS = { 15:"10/12當週(賽前最後一次FTP校準)" };
 /* 游泳校準:泳池單獨100m出發間隔2:30(游約2:15)、團練跟游2:10 → 泳池T-pace≈2:15
    EN1連續游2:25-2:35 · EN2間隔2:40 · THR間隔2:30 · 比賽2:05靠防寒衣+跟游達成 */
 
@@ -244,13 +251,13 @@ export default function SeasonPlan(){
         ? mk(<BikeIcon size={13}/>,C.water,{t:"測驗前減壓",v:"30分·TSS15",x:`30分鐘 @${W(0.45)}-${W(0.55)}W 純輕鬆迴轉,迴轉數95-105,不做任何強度 — 明日FTP測驗,今天的任務是讓腿完全新鮮。跑步也建議只做輕鬆跑或休息。`},"wed-b")
         : mk(<BikeIcon size={13}/>,C.power,{...week.bike.wed,v:`${week.bike.wed.v}·TSS${week.bike.wed.tss}`},"wed-b") ] },
     { day:"thu", items:[ {run:"thu"}, isTestWeek
-        ? mk(<BikeIcon size={13}/>,C.red,{t:"🔬 FTP 重測",v:"約60分",x:`熱身20分(含3x1分加速);20分鐘全力測驗(前2分別衝過頭,找到能撐滿20分的最大穩定輸出);緩和15分。取20分平均功率×0.95=新FTP。測驗當天週三課降為30分輕鬆迴轉、前一晚睡飽。測完把新數值告訴教練更新課表。現行FTP ${FTP}W → 目標區間 ${W(1.02)}-${W(1.08)}W`},"thu-test")
+        ? mk(<BikeIcon size={13}/>,C.red,{t:"🔬 FTP 重測",v:"約60分",x:`熱身20分(含3x1分加速);20分鐘全力測驗(前2分別衝過頭,找到能撐滿20分的最大穩定輸出);緩和15分。取20分平均功率×0.95=新FTP。測驗當天週三課降為30分輕鬆迴轉、前一晚睡飽。這是11/8賽前最後一次FTP測驗。W14先完成205km關鍵模擬，W15週四在恢復正常時測；測完更新後續功率區間。若W14疲勞尚未吸收，寧可取消測驗、不硬測。現行FTP ${FTP}W → 目標區間 ${W(1.02)}-${W(1.08)}W`},"thu-test")
         : mk(<BikeIcon size={13}/>,C.power,{...week.bike.thu,v:`${week.bike.thu.v}·TSS${week.bike.thu.tss}`},"thu-b") ] },
     { day:"fri", items:[ {run:"fri"}, isTestWeek
         ? mk(<Waves size={13}/>,C.water,{t:"測驗後恢復游",v:"1200m",x:"熱身300m;主課 6x100m EN2 出發間隔2:45;緩和300m。昨日力竭測驗,今天只求活動度與血流,不做閾值。"},"fri-sw")
         : mk(<Waves size={13}/>,C.water,week.swim.fri,"fri-sw") ] },
     { day:"sat", items:[ {run:"sat"}, isTestWeek
-        ? mk(<BikeIcon size={13}/>,C.power,{t:"測驗後恢復長騎",v:"150分·TSS105",x:`連續150分鐘 @${W(0.60)}-${W(0.70)}W,不做加強段;週四力竭測驗後神經疲勞需48-72小時,本週長騎只求時數不求強度。用新FTP的功率區間執行。`},"sat-b")
+        ? mk(<BikeIcon size={13}/>,C.power,{t:"FTP測驗後恢復長騎",v:"120–150分·低Z2",x:`連續120–150分鐘 @${W(0.58)}-${W(0.68)}W；不做Race Power、不追TSS。W14已完成205km關鍵模擬，本週任務是取得乾淨FTP數據並吸收疲勞。`},"sat-b")
         : mk(<BikeIcon size={13}/>,C.power,{...week.bike.sat,v:`${week.bike.sat.v}·TSS${week.bike.sat.tss}`},"sat-b") ] },
     { day:"sun", items:[ {run:"sun"}, mk(<Waves size={13}/>,C.water,week.swim.sun,"sun-sw") ] },
   ];
@@ -311,13 +318,13 @@ export default function SeasonPlan(){
           <span style={{ color:C.muted }}>{phase.note}</span>
           <span style={{ color:C.muted }}>|</span>
           <span style={{ color:C.muted, display:"flex", gap:4, alignItems:"center" }}><Sun size={11}/>{climate(month)}</span>
-          {isTestWeek && <span style={{ fontSize:11, color:C.red, fontWeight:600 }}>🔬 本週四 FTP 重測(全週降量:二輕重訓·三輕鬆迴轉·六只求時數)</span>}
+          {isTestWeek && <span style={{ fontSize:11, color:C.red, fontWeight:600 }}>🔬 本週四 FTP 重測：W14 205km模擬後先吸收疲勞；二重訓減量·三輕鬆迴轉·五恢復游·六低Z2。這是11/8前最後一次FTP校準</span>}
           {!week.race && <span className="mono" style={{ fontSize:10.5, color:C.power, marginLeft:"auto" }}>騎TSS≈{bikeTss}</span>}
         </div>
 
         {!week.race && (
           <div style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:10, padding:"8px 11px", marginBottom:10, fontSize:11, lineHeight:1.55, color:C.muted }}>
-            <b style={{ color:C.water }}>室內長課三要件</b>：①散熱 — 兩台風扇(上身+腿)、室溫≤24°C、每20分補水;8月實測第2-3小時掉10W多為熱負荷所致 ②補給 — 每小時碳水60-70g(逐週腸胃訓練,耐受良好可往70-80g/h),長課前後量體重,掉超過2%代表補水不足 ③監控 — 記錄Pw:HR脫鉤值(目標低於5%)、前後半平均功率/心率與分段EF;同功率下心率更低、或同心率下功率提升,代表durability進步。
+            <b style={{ color:C.water }}>室內長課三要件</b>：①散熱 — 兩台風扇(上身+腿)、室溫≤24°C、每20分補水;8月實測第2-3小時掉10W多為熱負荷所致 ②補給 — 每小時碳水60-70g(逐週腸胃訓練,耐受良好可往70-80g/h),長課前後量體重,掉超過2%代表補水不足 ③監控 — 記錄Pw:HR脫鉤值(目標&lt;5%)、前後半平均功率/心率與分段EF;同功率下心率更低、或同心率下功率提升,代表durability進步。
           </div>
         )}
         {week.race ? <RaceWeek/> : (
