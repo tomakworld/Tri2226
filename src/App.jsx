@@ -1,4 +1,3 @@
-import { storage } from "./storage.js";
 import React, { useState, useEffect, useMemo } from "react";
 import { Waves, Bike as BikeIcon, Footprints, Dumbbell, Moon, Settings2, ChevronLeft, ChevronRight, Flag, Sun, ChevronDown, Minus, Plus, RotateCcw, Link2 } from "lucide-react";
 
@@ -46,6 +45,62 @@ function encodeProfile(p){
 }
 function decodeProfile(str){
   try { return JSON.parse(decodeURIComponent(atob(str))); } catch(e){ return null; }
+}
+
+/* ---------------- persistent profile storage ----------------
+   Priority on load:
+   1) ?d= shared/personal URL payload
+   2) window.storage (host environment)
+   3) localStorage (normal browser fallback)
+   Saving writes to BOTH storage layers when available and keeps ?d= updated.
+---------------------------------------------------------------- */
+const PROFILE_KEY = "athlete:profile:v4";
+async function loadSavedProfile(){
+  // URL payload is the most portable source and works across devices/bookmarks.
+  try {
+    const raw = new URLSearchParams(window.location.search).get("d");
+    const fromUrl = raw ? decodeProfile(raw) : null;
+    if (fromUrl) return { value: fromUrl, source:"url" };
+  } catch(e){}
+
+  // Host-provided persistent storage.
+  try {
+    if (window.storage) {
+      const p = await window.storage.get(PROFILE_KEY, false);
+      if (p && p.value) return { value: JSON.parse(p.value), source:"storage" };
+      // Backward compatibility with previous versions.
+      const old = await window.storage.get("athlete:profile", false);
+      if (old && old.value) return { value: JSON.parse(old.value), source:"storage-old" };
+    }
+  } catch(e){}
+
+  // Browser fallback.
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY) || localStorage.getItem("athlete:profile");
+    if (raw) return { value: JSON.parse(raw), source:"localStorage" };
+  } catch(e){}
+
+  return null;
+}
+async function persistProfile(next){
+  const raw = JSON.stringify(next);
+
+  try {
+    if (window.storage) await window.storage.set(PROFILE_KEY, raw, false);
+  } catch(e){}
+
+  try {
+    localStorage.setItem(PROFILE_KEY, raw);
+  } catch(e){}
+
+  // Keep a portable restore payload in the URL without reloading the page.
+  try {
+    const enc = encodeProfile(next);
+    if (enc) {
+      const url = `${window.location.pathname}?d=${enc}${window.location.hash}`;
+      window.history.replaceState(null, "", url);
+    }
+  } catch(e){}
 }
 function isoOfMonday(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
@@ -100,6 +155,125 @@ function tssCalc(segs){ return Math.round(segs.reduce((a,[m,i]) => a + m*i*i, 0)
 function trainerLong(mins){ return `室內 ${round5(mins*0.85)}分（戶外 ${mins}分）`; }
 function fmtHM(sec){ const h=Math.floor(sec/3600), m=Math.round((sec%3600)/60); return `${h}:${String(m).padStart(2,"0")}`; }
 
+/* ---------------- athlete profile / load scaling ---------------- */
+function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+function athleteModel(profile, dist){
+  const hrs = Math.max(0, +profile.weekHours || 0);
+  const swimKm = Math.max(0, +profile.curSwimKm || 0);
+  const bikeH = Math.max(0, +profile.curBikeHours || 0);
+  const runKm = Math.max(0, +profile.curRunKm || 0);
+  const exp = profile.triExp || "first";
+  const goal = profile.goalType || "finish";
+  const strengthExp = profile.strengthExp || "none";
+
+  // 週量耐受度是 volume 的主要依據；速度能力仍由 FTP/T-pace/HM PB 決定。
+  const targetH = dist.id === "226" ? 11 : 8;
+  const timeFactor = hrs > 0 ? clamp(hrs / targetH, 0.62, 1.18) : 0.82;
+  const baseLoad = dist.id === "226"
+    ? clamp((swimKm/7 + bikeH/6 + runKm/45) / 3, 0.55, 1.18)
+    : clamp((swimKm/5 + bikeH/4.5 + runKm/35) / 3, 0.60, 1.18);
+  const expFactor = { first:0.88, sprint:0.92, "113":1.0, "226":1.08, multi:1.12 }[exp] || 0.9;
+  const goalFactor = { finish:0.92, pb:1.0, ag:1.07, custom:1.0 }[goal] || 1.0;
+  let volumeFactor = clamp(0.45*timeFactor + 0.35*baseLoad + 0.20*expFactor, 0.58, 1.15);
+  const qualityFactor = clamp((expFactor*0.55 + goalFactor*0.45), 0.85, 1.10);
+
+  const longestBike = Math.max(0, +profile.longBikeKm || 0);
+  const longestRun = Math.max(0, +profile.longRunKm || 0);
+  const longestSwim = Math.max(0, +profile.longSwimM || 0);
+  const readiness = [];
+  let readinessFactor = 1;
+  if (dist.id === "226") {
+    if (longestBike && longestBike < 100) { readiness.push("目前最長騎乘未達100km，長騎進階採保守模式"); readinessFactor *= 0.94; }
+    if (longestRun && longestRun < 20) { readiness.push("目前最長跑不足20km，跑量需優先建立耐受度"); readinessFactor *= 0.96; }
+    if (longestSwim && longestSwim < 2500) { readiness.push("目前最長游泳不足2500m，先建立連續游耐力"); readinessFactor *= 0.97; }
+  } else {
+    if (longestBike && longestBike < 60) { readiness.push("目前最長騎乘未達60km，113長騎採保守進階"); readinessFactor *= 0.95; }
+    if (longestRun && longestRun < 12) { readiness.push("目前最長跑不足12km，先建立跑步耐受度"); readinessFactor *= 0.97; }
+  }
+  volumeFactor = clamp(volumeFactor * readinessFactor, 0.55, 1.15);
+  const br = bikeRunModel(profile, dist);
+  return { hrs, swimKm, bikeH, runKm, exp, goal, strengthExp, timeFactor, baseLoad, expFactor, goalFactor, readinessFactor, volumeFactor, qualityFactor, readiness, br };
+}
+
+/* ---------------- bike/run relative-strength personalization ----------------
+   Swim remains technique-led: T-pace sets pace zones, while swim volume follows
+   overall load capacity/readiness rather than a "strong/weak" numeric ranking.
+   Bike + Run can be compared more defensibly from FTP W/kg, open-HM ability,
+   current discipline load, longest-session readiness, and (when complete)
+   previous triathlon bike/run splits.
+-------------------------------------------------------------------------- */
+function bikeRunModel(profile, dist){
+  const ftp = Math.max(0, +profile.ftp || 0);
+  const kg = Math.max(1, +profile.weight || 1);
+  const wkg = ftp / kg;
+  const hm = parseHMM(profile.hm);
+  const hmPace = hm ? hm / 21.0975 : null; // sec/km
+
+  // Ability anchors are intentionally broad; they create relative emphasis,
+  // not a population percentile or medical/physiological classification.
+  const bikeAbility = clamp((wkg - 2.2) / 2.2, 0, 1);
+  const runAbility = hmPace ? clamp((360 - hmPace) / 120, 0, 1) : 0.5;
+
+  // Durability/readiness: current weekly discipline load + longest session.
+  const bikeWeeklyRef = dist.id === "226" ? 6 : 4.5;
+  const runWeeklyRef = dist.id === "226" ? 45 : 35;
+  const bikeLongRef = dist.id === "226" ? 140 : 75;
+  const runLongRef = dist.id === "226" ? 28 : 18;
+  const bikeDur = clamp(((+profile.curBikeHours||0)/bikeWeeklyRef)*0.55 + ((+profile.longBikeKm||0)/bikeLongRef)*0.45, 0, 1.15);
+  const runDur = clamp(((+profile.curRunKm||0)/runWeeklyRef)*0.55 + ((+profile.longRunKm||0)/runLongRef)*0.45, 0, 1.15);
+
+  let bikeScore = bikeAbility*0.65 + clamp(bikeDur,0,1)*0.35;
+  let runScore = runAbility*0.65 + clamp(runDur,0,1)*0.35;
+
+  // Complete previous-race bike/run splits add a small durability-specific signal.
+  const lastB = parseHMM(profile.lastBike), lastR = parseHMM(profile.lastRun);
+  if (lastB && lastR) {
+    const bikeKmh = dist.bk / (lastB/3600);
+    const runP = lastR / dist.rn;
+    const bikeRace = clamp((bikeKmh - (dist.id==="226"?27:29)) / 10, 0, 1);
+    const runRace = clamp(((dist.id==="226"?390:360) - runP) / 120, 0, 1);
+    bikeScore = bikeScore*0.85 + bikeRace*0.15;
+    runScore = runScore*0.85 + runRace*0.15;
+  }
+
+  const delta = bikeScore - runScore;
+  let bikeFactor = 1, runFactor = 1, label = "騎跑均衡";
+  if (delta >= 0.18) {
+    // Bike is relatively stronger: preserve bike quality, shift a small amount
+    // of volume budget toward run development.
+    bikeFactor = 0.95; runFactor = 1.08; label = "單車相對強・跑步優先";
+  } else if (delta <= -0.18) {
+    bikeFactor = 1.08; runFactor = 0.95; label = "跑步相對強・單車優先";
+  } else if (delta >= 0.08) {
+    bikeFactor = 0.98; runFactor = 1.04; label = "單車略強";
+  } else if (delta <= -0.08) {
+    bikeFactor = 1.04; runFactor = 0.98; label = "跑步略強";
+  }
+
+  // Goal can increase quality, but discipline reallocation stays deliberately small.
+  // The overall athleteModel still caps total load by available time/readiness.
+  return { wkg, hmPace, bikeAbility, runAbility, bikeDur, runDur, bikeScore, runScore, delta, bikeFactor, runFactor, label };
+}
+
+function scaledMinutes(v, A, min=20){ return Math.max(min, round5(v * A.volumeFactor)); }
+function scaledDistance(v, A, min=800){ return Math.max(min, round50(v * A.volumeFactor)); }
+function strengthFor(phase, exp){
+  if (exp === "none") {
+    const beginner = {
+      base:{t:"肌力入門",x:"2-3組x10-12下：徒手/杯式深蹲、臀橋、划船、提踵、抗旋轉核心；保留3-4下餘裕，先學動作"},
+      build1:{t:"肌力建立",x:"3組x8-10下，逐步加重但不做到力竭；單邊動作+核心"},
+      build2:{t:"肌力維持",x:"2-3組x6-8下，中等重量；不安排高衝擊爆發動作"},
+      peak:{t:"肌力維持",x:"2組x6-8下，總量減半，不追重量PR"},
+      taper:{t:"神經活化",x:"彈力帶+動態熱身10分鐘內"}, race:{t:"賽前活化(選)",x:"動態熱身10分鐘內或跳過"}
+    }; return beginner[phase];
+  }
+  if (exp === "lt1") {
+    const x = STRENGTH[phase];
+    return {...x, x:x.x.replace("4-6RM,3-4組","6-8RM,3組").replace("維持4-6RM","維持6-8RM")};
+  }
+  return STRENGTH[phase];
+}
+
 /* ---------------- strength ---------------- */
 const STRENGTH = {
   base:  {t:"肌力基礎", x:"3-4組x8-10下:深蹲/硬舉/臥推/划船;單邊動作+抗旋轉核心;每週+3-5%負荷"},
@@ -111,14 +285,16 @@ const STRENGTH = {
 };
 
 /* ---------------- swim/bike generators ---------------- */
-function genSwimBike(phase, wiRaw, rec, dist) {
+function genSwimBike(phase, wiRaw, rec, dist, A) {
   const wi = Math.min(wiRaw, 6);
-  const f = (rec ? 0.72 : 1) * dist.k;
+  const f = (rec ? 0.72 : 1) * dist.k * (A?.volumeFactor || 1);
+  const bf = A?.br?.bikeFactor || 1;
+  const qf = A?.qualityFactor || 1;
   if (phase === "base") {
     const r1=Math.max(6,Math.round((8+(wi-1))*f)), r2=Math.max(6,Math.round((10+(wi-1)*2)*f));
     const d3=Math.max(1400,round50((2000+(wi-1)*250)*f));
-    const bw=Math.max(55,round5((75+(wi-1)*5)*f)), bte=Math.max(8,Math.round((12+(wi-1)*2)*f)), btr=4;
-    const bs=Math.max(120,round5((170+(wi-1)*25)*f));
+    const bw=Math.max(55,round5((75+(wi-1)*5)*f*bf)), bte=Math.max(8,Math.round((12+(wi-1)*2)*f*qf*clamp(bf,0.96,1.05))), btr=4;
+    const bs=Math.max(120,round5((170+(wi-1)*25)*f*bf));
     return { swim:{
       tue:{t:"技術✕有氧", x:`熱身400m;技術8x50m;主課 ${r1}x150m {EN2} 息15秒;緩和200m`, v:`${800+r1*150+200}m`},
       fri:{t:"閾值間歇", x:`熱身400m;主課 ${r2}x100m {THR} 息15秒;緩和200m`, v:`${400+r2*100+200}m`},
@@ -132,8 +308,8 @@ function genSwimBike(phase, wiRaw, rec, dist) {
   if (phase === "build1") {
     const r1=Math.max(4,Math.round((6+(wi-1))*f)), r2=Math.max(3,Math.round((4+(wi-1))*f));
     const d3=Math.max(1800,round50((2600+(wi-1)*200)*f));
-    const bw=Math.max(60,round5((80+(wi-1)*5)*f)), bte=Math.max(12,Math.round((15+(wi-1)*2)*f)), btr=3;
-    const bs=Math.max(150,round5((220+(wi-1)*20)*f));
+    const bw=Math.max(60,round5((80+(wi-1)*5)*f*bf)), bte=Math.max(12,Math.round((15+(wi-1)*2)*f*qf*clamp(bf,0.96,1.05))), btr=3;
+    const bs=Math.max(150,round5((220+(wi-1)*20)*f*bf));
     return { swim:{
       tue:{t:"有氧量能", x:`熱身400m;技術8x50m;主課 ${r1}x200m {EN2} 息20秒;緩和200m`, v:`${800+r1*200+200}m`},
       fri:{t:"長閾值", x:`熱身400m;主課 ${r2}x300m {THR} 息30秒;緩和200m`, v:`${400+r2*300+200}m`},
@@ -147,8 +323,8 @@ function genSwimBike(phase, wiRaw, rec, dist) {
   if (phase === "build2") {
     const r1=Math.max(4,Math.round((6+(wi-1))*f)), r2=Math.max(3,Math.round((5+(wi-1))*f));
     const d3=Math.max(2200,round50((3000+(wi-1)*200)*f));
-    const bw=Math.max(60,round5((85+(wi-1)*5)*f)), bte=Math.max(14,Math.round((18+(wi-1)*3)*f)), btr=3;
-    const bs=Math.max(180,round5((270+(wi-1)*25)*f));
+    const bw=Math.max(60,round5((85+(wi-1)*5)*f*bf)), bte=Math.max(14,Math.round((18+(wi-1)*3)*f*qf*clamp(bf,0.96,1.05))), btr=3;
+    const bs=Math.max(180,round5((270+(wi-1)*25)*f*bf));
     const brick = wi>=2 && !rec;
     return { swim:{
       tue:{t:"有氧維持", x:`熱身400m;技術6x50m;主課 ${r1}x200m {EN2} 息20秒;緩和200m`, v:`${700+r1*200+200}m`},
@@ -226,9 +402,11 @@ function genSwimBike(phase, wiRaw, rec, dist) {
 }
 
 /* ---------------- run generator ---------------- */
-function genRun(phase, wiRaw, rec, rp, key, dist) {
+function genRun(phase, wiRaw, rec, rp, key, dist, A) {
   const wi = Math.min(wiRaw, 5);
-  const kk = dist && dist.id==="113" ? 0.8 : 1;
+  const rf = A?.br?.runFactor || 1;
+  const kk = (dist && dist.id==="113" ? 0.8 : 1) * (A?.volumeFactor || 1) * rf;
+  const qk = (A?.qualityFactor || 1) * clamp(rf,0.96,1.05);
   const capLong = dist && dist.id==="113" ? 24 : 30;
   const secStr = (t) => t>=60 ? `${Math.floor(t/60)}:${String(Math.round(t%60)).padStart(2,"0")}` : `${Math.round(t)}秒`;
   const REP = (m, lo, hi) => rp ? `(每趟 ${secStr(lo*m/1000)}${hi&&hi!==lo?`-${secStr(hi*m/1000)}`:""})` : "";
@@ -245,9 +423,9 @@ function genRun(phase, wiRaw, rec, rp, key, dist) {
   if (phase === "base") {
     const lk = Math.round((rec ? 14 : 16 + wi*2)*kk);
     return {
-      wed:{ t:"間歇", x:`熱身2km;${rec?6:8+wi}x400m ${rp?`目標 ${secStr(rp.itv[0]*0.4)}-${secStr(rp.itv[1]*0.4)}/趟`:"間歇強度"} 慢跑200m恢復;緩和1km`, v:`${rec?6:8+wi}x400m` },
+      wed:{ t:"間歇", x:`熱身2km;${rec?6:Math.max(6,Math.round((8+wi)*qk))}x400m ${rp?`目標 ${secStr(rp.itv[0]*0.4)}-${secStr(rp.itv[1]*0.4)}/趟`:"間歇強度"} 慢跑200m恢復;緩和1km`, v:`${rec?6:Math.max(6,Math.round((8+wi)*qk))}x400m` },
       thu: easyRun,
-      fri:{ t:"速度節奏", x:`熱身2km;${rec?6:10}x300m ${rp?`目標 ${secStr(rp.itv[0]*0.3)}-${secStr(rp.itv[1]*0.3)}/趟`:"間歇強度"} +100m慢;緩和1km`, v:`${rec?6:10}x300m` },
+      fri:{ t:"速度節奏", x:`熱身2km;${rec?6:Math.max(6,Math.round(10*qk))}x300m ${rp?`目標 ${secStr(rp.itv[0]*0.3)}-${secStr(rp.itv[1]*0.3)}/趟`:"間歇強度"} +100m慢;緩和1km`, v:`${rec?6:Math.max(6,Math.round(10*qk))}x300m` },
       sat: easyRun,
       sun:{ t:"長跑", x:`${lk}km:前2/3 @${lng} 漸速至 ${mp},末1/3 @${im} 練節奏轉換`, v:`${lk}km` },
     };
@@ -255,9 +433,9 @@ function genRun(phase, wiRaw, rec, rp, key, dist) {
   if (phase === "build1") {
     const lk = Math.round((rec ? 16 : 21 + wi*2)*kk);
     return {
-      wed:{ t:"間歇", x:`熱身2km;${rec?3:5}x1000m ${rp?`目標 ${secStr(rp.thr)}/趟`:"閾值"} 休2分;緩和1km`, v:`${rec?3:5}x1000m` },
+      wed:{ t:"間歇", x:`熱身2km;${rec?3:Math.max(3,Math.round(5*qk))}x1000m ${rp?`目標 ${secStr(rp.thr)}/趟`:"閾值"} 休2分;緩和1km`, v:`${rec?3:Math.max(3,Math.round(5*qk))}x1000m` },
       thu: easyRun,
-      fri:{ t:"節奏跑", x:`熱身2km;${rec?15:20+wi*5}分連續 @${thr};緩和1km`, v:`${rec?15:20+wi*5}分` },
+      fri:{ t:"節奏跑", x:`熱身2km;${rec?15:Math.round((20+wi*5)*qk)}分連續 @${thr};緩和1km`, v:`${rec?15:Math.round((20+wi*5)*qk)}分` },
       sat: easyRun,
       sun:{ t:"長跑", x:`${lk}km @${lng},中段3x2km @${mp};每40分補給`, v:`${lk}km` },
     };
@@ -299,7 +477,7 @@ function genRun(phase, wiRaw, rec, rp, key, dist) {
 }
 
 /* ---------------- plan builder ---------------- */
-function buildPlan(raceDateStr, dist, startStr) {
+function buildPlan(raceDateStr, dist, startStr, A) {
   const race = new Date(raceDateStr + "T00:00:00");
   if (isNaN(race)) return null;
   let start;
@@ -321,7 +499,7 @@ function buildPlan(raceDateStr, dist, startStr) {
     for (let wi = 1; wi <= count; wi++) {
       const isTrainPhase = ["base","build1","build2"].includes(phase);
       const rec = isTrainPhase && count >= 3 && (wi === count || (wi % 4 === 0 && wi !== count));
-      const sb = genSwimBike(phase, wi, rec, dist);
+      const sb = genSwimBike(phase, wi, rec, dist, A);
       weeks.push({ n: idx++, phase, rest: rec, key: !!sb.key, swim: sb.swim, bike: sb.bike, wi });
     }
   };
@@ -334,7 +512,7 @@ function buildPlan(raceDateStr, dist, startStr) {
 
 /* ---------------- main ---------------- */
 export default function IronmanPlan() {
-  const [profile, setProfile] = useState({ height: 175, weight: 68, ftp: 250, tpace: "1:35", hm: "1:32", dist: "226", raceDate: "2026-11-08", startDate: "", lastSwim: "", lastBike: "", lastRun: "", goal: "", adjS: 0, adjB: 0, adjR: 0 });
+  const [profile, setProfile] = useState({ height: 175, weight: 68, ftp: 250, tpace: "1:35", hm: "1:32", dist: "226", raceDate: "2026-11-08", startDate: "", lastSwim: "", lastBike: "", lastRun: "", goal: "", adjS: 0, adjB: 0, adjR: 0, weekHours:8, curSwimKm:4, curBikeHours:4, curRunKm:30, longSwimM:2000, longBikeKm:80, longRunKm:18, triExp:"first", goalType:"finish", strengthExp:"none" });
   const [editing, setEditing] = useState(true);
   const [selected, setSelected] = useState(1);
   const [expanded, setExpanded] = useState(null);
@@ -342,18 +520,33 @@ export default function IronmanPlan() {
   useEffect(() => {
     (async () => {
       try {
-        const p = await storage.get("athlete:profile", false);
-        if (p && p.value) {
-          const loaded = JSON.parse(p.value);
-          if (!loaded.startDate) { loaded.startDate = isoOfMonday(mondayOfThisWeek());  }
-          setProfile((d) => ({ ...d, ...loaded })); setEditing(false);
-        } else { setProfile((d) => ({ ...d, startDate: isoOfMonday(mondayOfThisWeek()) })); }
-      } catch (e) {}
+        const saved = await loadSavedProfile();
+        if (saved && saved.value) {
+          const loaded = { ...saved.value };
+          if (!loaded.startDate) loaded.startDate = isoOfMonday(mondayOfThisWeek());
+          setProfile((d) => ({ ...d, ...loaded }));
+          setEditing(false);
+
+          // Migrate/refresh all persistence layers after loading an old or URL profile.
+          await persistProfile({ ...profile, ...loaded });
+        } else {
+          const initial = { ...profile, startDate: isoOfMonday(mondayOfThisWeek()) };
+          setProfile(initial);
+          await persistProfile(initial);
+        }
+      } catch (e) {
+        const initial = { ...profile, startDate: isoOfMonday(mondayOfThisWeek()) };
+        setProfile(initial);
+      }
     })();
+    // Initial load only; profile defaults are intentionally captured once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { setExpanded(null); }, [selected]);
   const [autoJumped, setAutoJumped] = useState(false);
-  const planForJump = useMemo(() => buildPlan(profile.raceDate, { id: profile.dist || "226", ...DISTS[profile.dist || "226"] }, profile.startDate), [profile.raceDate, profile.dist, profile.startDate]);
+  const distForJump = { id: profile.dist || "226", ...DISTS[profile.dist || "226"] };
+  const athleteForJump = athleteModel(profile, distForJump);
+  const planForJump = useMemo(() => buildPlan(profile.raceDate, distForJump, profile.startDate, athleteForJump), [profile.raceDate, profile.dist, profile.startDate, profile.weekHours, profile.curSwimKm, profile.curBikeHours, profile.curRunKm, profile.longBikeKm, profile.longRunKm, profile.ftp, profile.weight, profile.hm, profile.lastBike, profile.lastRun, profile.triExp, profile.goalType]);
   useEffect(() => {
     if (autoJumped || !planForJump || planForJump.error) return;
     const cur = Math.floor((mondayOfThisWeek() - planForJump.start) / (7 * 864e5)) + 1;
@@ -363,15 +556,12 @@ export default function IronmanPlan() {
 
   async function saveProfile(next) {
     setProfile(next);
-    try { await storage.set("athlete:profile", JSON.stringify(next), false); } catch (e) {}
-    try {
-      const enc = encodeProfile(next);
-      if (enc) window.history.replaceState(null, "", `${window.location.pathname}?d=${enc}${window.location.hash}`);
-    } catch (e) {}
+    await persistProfile(next);
   }
 
   const dist = { id: profile.dist || "226", ...DISTS[profile.dist || "226"] };
-  const plan = useMemo(() => buildPlan(profile.raceDate, dist, profile.startDate), [profile.raceDate, profile.dist, profile.startDate]);
+  const athlete = athleteModel(profile, dist);
+  const plan = useMemo(() => buildPlan(profile.raceDate, dist, profile.startDate, athlete), [profile.raceDate, profile.dist, profile.startDate, profile.weekHours, profile.curSwimKm, profile.curBikeHours, profile.curRunKm, profile.longBikeKm, profile.longRunKm, profile.ftp, profile.weight, profile.hm, profile.lastBike, profile.lastRun, profile.triExp, profile.goalType]);
   const rp = runPaces(profile.hm, dist);
   const tpaceSec = parseMS(profile.tpace);
   const now = new Date();
@@ -390,7 +580,7 @@ export default function IronmanPlan() {
   const phase = PHASES[week.phase];
   const dateFor = (weekN, dayKey) => { const d = new Date(start); d.setDate(d.getDate() + (weekN-1)*7 + DAY_OFFSET[dayKey]); return d; };
   const bikeTss = week.race ? 0 : (week.bike.wed.tss||0)+(week.bike.thu.tss||0)+(week.bike.sat.tss||0);
-  const run = week.race ? null : genRun(week.phase, week.wi, week.rest, rp, week.key, dist);
+  const run = week.race ? null : genRun(week.phase, week.wi, week.rest, rp, week.key, dist, athlete);
   const monMonth = dateFor(week.n, "mon").getMonth() + 1;
   const RUNCOLOR = { wed:C.red, thu:C.green, fri:C.red, sat:C.green, sun:C.gold };
 
@@ -400,7 +590,7 @@ export default function IronmanPlan() {
 
   const rows = week.race ? [] : [
     { day:"mon", items:[{ rest:true }] },
-    { day:"tue", items:[{ id:"tue-str", color:C.iron, icon:<Dumbbell size={13}/>, title:STRENGTH[week.phase].t, detail:STRENGTH[week.phase].x }, mkSwim("tue")] },
+    { day:"tue", items:[{ id:"tue-str", color:C.iron, icon:<Dumbbell size={13}/>, title:strengthFor(week.phase, profile.strengthExp).t, detail:strengthFor(week.phase, profile.strengthExp).x }, mkSwim("tue")] },
     { day:"wed", items:[mkRun("wed"), mkBike("wed")] },
     { day:"thu", items:[mkRun("thu"), mkBike("thu")] },
     { day:"fri", items:[mkRun("fri"), mkSwim("fri")] },
@@ -496,15 +686,15 @@ function Shell({ profile, editing, setEditing, saveProfile, rp, raceInfo, childr
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=Roboto+Mono:wght@500;600&display=swap');
         .osw { font-family:'Oswald',sans-serif; } .mono { font-family:'Roboto Mono',monospace; }
-        input { background:#fff; border:1px solid ${C.line}; color:${C.text}; border-radius:8px; padding:8px 10px; font-family:'Roboto Mono',monospace; font-size:14px; width:100%; }
-        button:focus-visible, input:focus-visible { outline:2px solid ${C.water}; outline-offset:2px; }
+        input,select { background:#fff; border:1px solid ${C.line}; color:${C.text}; border-radius:8px; padding:8px 10px; font-family:'Roboto Mono',monospace; font-size:14px; width:100%; }
+        button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid ${C.water}; outline-offset:2px; }
         .strip::-webkit-scrollbar{ height:4px; } .strip::-webkit-scrollbar-thumb{ background:${C.line}; border-radius:4px; }
         .rowbtn { transition: background .12s ease; } .rowbtn:hover { background:${C.surface2}; }
       `}</style>
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "20px 16px 50px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div>
-            <h1 className="osw" style={{ fontSize: 21, fontWeight: 600, margin: 0, letterSpacing: 0.5 }}>Ironman 訓練面板</h1>
+            <h1 className="osw" style={{ fontSize: 21, fontWeight: 600, margin: 0, letterSpacing: 0.5 }}>Ironman 個人化訓練面板 V4</h1>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{raceInfo || "輸入數據,自動生成整期課表"}</div>
           </div>
           <button onClick={() => setEditing((v) => !v)} style={{ background: C.surface, border:`1px solid ${C.line}`, borderRadius:10, padding:"7px 10px", color:C.text, display:"flex", gap:5, alignItems:"center", cursor:"pointer", fontSize:12, flexShrink:0 }}>
@@ -535,20 +725,36 @@ function Shell({ profile, editing, setEditing, saveProfile, rp, raceInfo, childr
               <Field label="體重 kg"><input type="number" value={profile.weight} onChange={(e) => saveProfile({ ...profile, weight:+e.target.value })} /></Field>
               <Field label="身高 cm"><input type="number" value={profile.height} onChange={(e) => saveProfile({ ...profile, height:+e.target.value })} /></Field>
               </div>
+              <div style={{ fontSize:10.5, color:C.power, fontWeight:700, margin:"14px 0 6px", letterSpacing:0.5 }}>② 訓練耐受度（總週量）＋騎跑數據個人化</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                <Field label="每週可訓練 小時"><input type="number" min="3" step="0.5" value={profile.weekHours||""} onChange={(e)=>saveProfile({...profile,weekHours:+e.target.value})}/></Field>
+                <Field label="目前每週游泳 km（只校正總量，不做強弱排名）"><input type="number" min="0" step="0.5" value={profile.curSwimKm||""} onChange={(e)=>saveProfile({...profile,curSwimKm:+e.target.value})}/></Field>
+                <Field label="目前每週單車 小時"><input type="number" min="0" step="0.5" value={profile.curBikeHours||""} onChange={(e)=>saveProfile({...profile,curBikeHours:+e.target.value})}/></Field>
+                <Field label="目前每週跑步 km"><input type="number" min="0" step="1" value={profile.curRunKm||""} onChange={(e)=>saveProfile({...profile,curRunKm:+e.target.value})}/></Field>
+                <Field label="最長連續游泳 m（耐力安全檢查）"><input type="number" min="0" step="100" value={profile.longSwimM||""} onChange={(e)=>saveProfile({...profile,longSwimM:+e.target.value})}/></Field>
+                <Field label="最長單車 km"><input type="number" min="0" step="5" value={profile.longBikeKm||""} onChange={(e)=>saveProfile({...profile,longBikeKm:+e.target.value})}/></Field>
+                <Field label="最長跑步 km"><input type="number" min="0" step="1" value={profile.longRunKm||""} onChange={(e)=>saveProfile({...profile,longRunKm:+e.target.value})}/></Field>
+                <Field label="三項經驗"><select value={profile.triExp||"first"} onChange={(e)=>saveProfile({...profile,triExp:e.target.value})}><option value="first">第一次參賽</option><option value="sprint">短距離/標鐵經驗</option><option value="113">完成過113</option><option value="226">完成過226</option><option value="multi">多次長距離</option></select></Field>
+                <Field label="訓練目標"><select value={profile.goalType||"finish"} onChange={(e)=>saveProfile({...profile,goalType:e.target.value})}><option value="finish">安全完賽</option><option value="pb">突破PB</option><option value="ag">競爭Age Group</option><option value="custom">自訂目標</option></select></Field>
+                <Field label="重訓經驗"><select value={profile.strengthExp||"none"} onChange={(e)=>saveProfile({...profile,strengthExp:e.target.value})}><option value="none">無經驗</option><option value="lt1">未滿1年</option><option value="1to3">1-3年</option><option value="3plus">3年以上</option></select></Field>
+              </div>
             <div style={{ marginTop:12, display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
               <button onClick={() => {
                 const url = `${window.location.origin}${window.location.pathname}?d=${encodeProfile(profile)}${window.location.hash}`;
                 navigator.clipboard?.writeText(url).then(()=>setCopied(true)).catch(()=>{});
                 setTimeout(()=>setCopied(false), 2500);
               }} style={{ background:C.water, border:"none", borderRadius:8, padding:"8px 14px", color:"#fff", fontSize:12.5, fontWeight:600, cursor:"pointer", display:"flex", gap:6, alignItems:"center" }}>
-                <Link2 size={14}/> 複製我的專屬連結
+                <Link2 size={14}/> 備份／複製我的專屬連結
               </button>
-              {copied && <span style={{ fontSize:11.5, color:C.green }}>✓ 已複製,存成書籤就不用再輸入資料</span>}
+              {copied && <span style={{ fontSize:11.5, color:C.green }}>✓ 已複製；同一裝置會自動儲存，換裝置可用此連結完整還原</span>}
+            </div>
+            <div style={{ fontSize:10.5, color:C.muted, marginTop:5, lineHeight:1.5 }}>
+              資料會自動同時儲存在目前環境與瀏覽器本機；網址中的專屬資料則作為跨裝置／瀏覽器備份。一般情況下重新開啟不需要重填。
             </div>
             <div style={{ fontSize:10.5, color:C.muted, marginTop:4, lineHeight:1.5 }}>
               手機瀏覽器可能會自動清除網站資料,建議複製連結後加入書籤或主畫面,換手機/換瀏覽器也能直接開啟同一份課表。
             </div>
-            <div style={{ fontSize:10.5, color:C.gold, fontWeight:700, margin:"12px 0 6px", letterSpacing:0.5 }}>② 拆分基準（僅影響目標拆分卡:有比賽成績優先採用,三項須齊全;未填則自動用①的PB預測）</div>
+            <div style={{ fontSize:10.5, color:C.gold, fontWeight:700, margin:"12px 0 6px", letterSpacing:0.5 }}>③ 拆分基準（僅影響目標拆分卡:有比賽成績優先採用,三項須齊全;未填則自動用①的PB預測）</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
               <Field label="上次比賽 游 h:mm"><input type="text" placeholder="1:25" value={profile.lastSwim} onChange={(e) => saveProfile({ ...profile, lastSwim:e.target.value })} /></Field>
               <Field label="上次比賽 騎 h:mm"><input type="text" placeholder="5:55" value={profile.lastBike} onChange={(e) => saveProfile({ ...profile, lastBike:e.target.value })} /></Field>
@@ -567,9 +773,32 @@ function Shell({ profile, editing, setEditing, saveProfile, rp, raceInfo, childr
             <PaceChip c={C.water} l="226" v={`${paceStr(rp.im[0])}-${paceStr(rp.im[1])}`} />
           </div>
         )}
+        <AthleteSummary profile={profile} />
         <GoalAnalysis profile={profile} saveProfile={saveProfile} />
         {children}
       </div>
+    </div>
+  );
+}
+
+function AthleteSummary({ profile }) {
+  const dist = { id: profile.dist || "226", ...DISTS[profile.dist || "226"] };
+  const A = athleteModel(profile, dist);
+  const lvl = A.volumeFactor < 0.72 ? "保守起步" : A.volumeFactor < 0.92 ? "標準進階" : "高耐受進階";
+  return (
+    <div style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:12, padding:"9px 11px", marginBottom:10, fontSize:11.5, lineHeight:1.55 }}>
+      <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+        <b style={{ color:C.power }}>Athlete Profile</b>
+        <span className="mono">{lvl} · Volume ×{A.volumeFactor.toFixed(2)} · Quality ×{A.qualityFactor.toFixed(2)}</span>
+        <span style={{ color:C.muted }}>每週可用 {A.hrs||"未填"}hr · 目標 {({finish:"完賽",pb:"PB",ag:"Age Group",custom:"自訂"}[A.goal]||A.goal)}</span>
+      </div>
+      <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:5 }}>
+        <span style={{ border:`1px solid ${C.water}`, borderRadius:6, padding:"2px 6px", color:C.water }}>游泳：技術導向 · T-pace只定強度</span>
+        <span style={{ border:`1px solid ${C.power}`, borderRadius:6, padding:"2px 6px", color:C.power }}>單車：{A.br.label} · {A.br.wkg.toFixed(2)} W/kg · 量×{A.br.bikeFactor.toFixed(2)}</span>
+        <span style={{ border:`1px solid ${C.red}`, borderRadius:6, padding:"2px 6px", color:C.red }}>跑步：HM {A.br.hmPace?paceStr(A.br.hmPace):"未填"}/km · 量×{A.br.runFactor.toFixed(2)}</span>
+      </div>
+      {A.readiness.length > 0 && <div style={{ color:C.red, marginTop:4 }}>⚠ {A.readiness.join("；")}</div>}
+      <div style={{ color:C.muted, marginTop:4 }}>游泳不以T-pace做強弱排名；單車用FTP/Wkg＋單車耐久資料、跑步用半馬PB＋跑量/長跑資料做相對強弱判斷。騎跑只小幅重新分配負荷，總量仍受每週可用時間與既有訓練量限制。</div>
     </div>
   );
 }
