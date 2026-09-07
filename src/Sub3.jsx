@@ -2,7 +2,7 @@ import { storage } from "./storage.js";
 import React, { useState, useEffect, useMemo } from "react";
 import { Footprints, Dumbbell, Moon, Settings2, ChevronLeft, ChevronRight, Flag, ChevronDown, Zap, HeartPulse, Link2 } from "lucide-react";
 
-/* ============ C版:Sub-3 全馬課表(Daniels VDOT體系) ============ */
+/* ============ V2:Sub-3 全馬課表(Daniels VDOT + 真實週量 + 專項交替) ============ */
 
 /* ---- warm sunrise light theme ---- */
 const C = {
@@ -51,50 +51,87 @@ const SUB3_VDOT = 53.5;
 /* ---- 重訓週期(單腿+神經) ---- */
 const STRENGTH = {
   p1:{ h:"解剖適應期", tue:"保加利亞蹲 3x10-12/腿、單腳RDL 3x10、臀橋 3x12;核心抗旋轉;重點動作品質", fri:"輕負荷循環+跳繩 3x60下,喚醒彈性" },
-  p2:{ h:"最大肌力期", tue:"保加利亞蹲 4x5-6/腿(重)、六角槓硬舉 4x5、單腳提踵 4x8;組間休2-3分", fri:"低量神經課:跳箱 3x5、彈跳弓步 3x6/腿" },
-  p3:{ h:"爆發力轉換期", tue:"保加利亞蹲 3x3-5/腿(次大重量,追求速度)、負重跳蹲 3x5", fri:"增強式:立定跳遠 4x4、單腳跳 3x8/腿、短坡衝刺 6x10秒" },
-  p4:{ h:"神經維持期", tue:"保加利亞蹲 2x3/腿(重量維持)、跳蹲 2x5;總量減半", fri:"跳箱 2x4+4x100m加速,保持神經敏銳" },
+  p2:{ h:"最大肌力期", tue:"保加利亞蹲 4x5-6/腿(重)、六角槓硬舉 4x5、單腳提踵 4x8;組間休2-3分", fri:"低量神經課:跳箱 3x5、彈跳弓步 2x5/腿" },
+  p3:{ h:"馬拉松專項肌力維持", tue:"保加利亞蹲 2-3x3-5/腿(約80-85%1RM,保留1-2下餘裕)+六角槓硬舉2x3-5;不追PR", fri:"只做極低量神經刺激:4-6x20秒步幅或4x8秒短坡,完全恢復;不再堆plyometric volume" },
+  p4:{ h:"神經維持期", tue:"保加利亞蹲 2x3/腿(重量維持)+跳蹲2x4;總量減半", fri:"4x100m輕快步幅,完整恢復;不額外做高量跳躍" },
   taper:{ h:"活化期", tue:"彈力帶啟動+2x3輕快跳蹲,10分鐘內", fri:"動態伸展+4x60m加速,或跳過" },
   race:{ h:"比賽週", tue:"僅動態熱身", fri:"跳過" },
 };
 
-/* ---- Q課庫(依 Daniels Phase I-IV) ---- */
+/* ---- Q課庫(依 Daniels Phase I-IV；M專項不快於Sub-3目標4:15/km) ---- */
 function qOf(phase, wiRaw, rec, P){
   const wi = Math.min(wiRaw, 5);
-  const E=`${paceStr(P.eLo)}-${paceStr(P.eHi)}`, M=paceStr(P.m), T=paceStr(P.t), I=paceStr(P.i), R=paceStr(P.r);
+  const E=`${paceStr(P.eLo)}-${paceStr(P.eHi)}`;
+  const mSpecSec = Math.max(P.m, 255); // 能力更快也不把Sub-3專項M課推快於4:15/km
+  const M=paceStr(mSpecSec), T=paceStr(P.t), I=paceStr(P.i), R=paceStr(P.r);
   const secStr=(t)=> t>=60 ? `${Math.floor(t/60)}:${String(Math.round(t%60)).padStart(2,"0")}` : `${Math.round(t)}秒`;
-  const REP=(m,pace)=>`(每趟 ${secStr(pace*m/1000)})`;
   const rf = rec ? "(減量:7成)" : "";
-  if (phase==="p1") return {
-    q1:{ t:"Q1·坡度+R刺激", x:`E跑40-50分 @${E},其中插入8x20秒短坡衝或平地加速,回走完全恢復(長休息,純神經刺激不求乳酸);建立神經基礎${rf}`, v:"50分" },
-    q2:{ t:"Q2·T入門", x:`熱身3km;${rec?15:20}分連續 T @${T};緩和2km${rf}`, v:`${rec?15:20}分T` },
-    lg:{ km: rec?20 : 22+wi*2, note:`全程 E @${E},最後15分可至 M @${M}` },
-  };
-  if (phase==="p2") return {
-    q1:{ t:"Q1·I 間歇", x:`熱身3km;${rec?4:5+Math.min(wi,2)}x1000m 目標 ${secStr(P.i)}/趟 慢跑2-3分恢復(約1:0.8短休息,練VO2max與乳酸排除);緩和2km${rf} — I總量上限為週跑量8%,單堂不超過10km`, v:`${rec?4:5+Math.min(wi,2)}x1000` },
-    q2:{ t:"Q2·R 速度", x:`熱身3km;${rec?6:8}x400m 目標 ${secStr(P.r*0.4)}/趟 完全恢復慢跑400m(約1:2長休息,練最高速度與神經徵召,務必休滿);緩和2km${rf}`, v:`${rec?6:8}x400` },
-    lg:{ km: rec?24 : 26+wi*2, note:`E @${E},中段插入2x3km 目標 ${secStr(P.m*3)}/趟;90分以上開始練補給,每45分一次` },
-  };
-  if (phase==="p3") return {
-    q1:{ t:"Q1·T巡航+I", x:`熱身3km;2x3km 目標 ${secStr(P.t*3)}/趟 休2分(6:1) + 3x1000m 目標 ${secStr(P.i)}/趟 休2分(1:0.6);緩和2km${rf}`, v:"T+I混合" },
-    q2:{ t:"Q2·M配速", x:`熱身2km;${rec?8:10+wi*2}km 連續 @${M};收尾4x200m 目標 ${secStr(P.r*0.2)}/趟(維持跑步經濟性);緩和1km${rf}`, v:`${rec?8:10+wi*2}km@M` },
-    lg:{ km: Math.min(rec?26 : 28+wi*2, 32), note:`前段 E @${E},末${rec?6:10}km @${M} — Sub-3專項課;上限2.5小時,超時就停(時間比距離重要);每40分補給一次,演練比賽用膠` },
-  };
-  if (phase==="p4") return {
-    q1:{ t:"Q1·T鞏固", x:`熱身3km;2x20分 T @${T} 休4分(5:1極短休息,擴大有氧天花板);緩和2km${rf} — T總量以不超過週跑量10%為原則,若當週量偏低改為2x15分`, v:"2x20分T" },
-    q2:{ t:"Q2·M專項", x:`熱身2km;${rec?10:14}km @${M},鎖定目標節奏;收尾4x200m 目標 ${secStr(P.r*0.2)}/趟;緩和1km${rf}`, v:`${rec?10:14}km@M` },
-    lg:{ km: rec?24 : 28, note:`E @${E} 含 3x3km 目標 ${secStr(P.m*3)}/趟,演練比賽補給` },
-  };
-  if (phase==="taper") return {
-    q1:{ t:"Q1·敏銳", x:`熱身2km;${wi>=2?3:4}x1000m 目標 ${secStr(P.t)}/趟 休2分;緩和2km`, v:`${wi>=2?3:4}x1000T` },
-    q2:{ t:"Q2·開合", x:`熱身2km;${wi>=2?4:6}km @${M};4x100m加速;緩和1km`, v:`${wi>=2?4:6}km@M` },
-    lg:{ km: wi>=2?12:16, note:`E @${E},保持腿部記憶` },
-  };
+  const eMid=(P.eLo+P.eHi)/2;
+  const kmByMin=(mins,pace)=>Math.max(0, mins*60/pace);
+  const round1=(x)=>Math.round(x*10)/10;
+
+  if (phase==="p1") {
+    const tMin=rec?15:20;
+    return {
+      q1:{ t:"Q1·坡度+R刺激", x:`E跑40-50分 @${E},其中插入8x20秒短坡衝或平地加速,回走完全恢復;純神經刺激不求乳酸${rf}`, v:"50分", km:round1(kmByMin(50,eMid)) },
+      q2:{ t:"Q2·T入門", x:`熱身3km;${tMin}分連續 T @${T};緩和2km${rf}`, v:`${tMin}分T`, km:round1(5+kmByMin(tMin,P.t)) },
+      lg:{ km: rec?20 : Math.min(30,22+wi*2), note:`全程 E @${E},最後15分可至 M @${M}` },
+    };
+  }
+  if (phase==="p2") {
+    const reps=rec?4:5+Math.min(wi,2);
+    const rReps=rec?6:8;
+    return {
+      q1:{ t:"Q1·I 間歇", x:`熱身3km;${reps}x1000m 目標 ${secStr(P.i)}/趟 慢跑2-3分恢復;緩和2km${rf} — I總量上限週跑量8%`, v:`${reps}x1000`, km:round1(5+reps*1.45) },
+      q2:{ t:"Q2·R 速度", x:`熱身3km;${rReps}x400m 目標 ${secStr(P.r*0.4)}/趟,慢跑400m完整恢復;緩和2km${rf}`, v:`${rReps}x400`, km:round1(5+rReps*0.8) },
+      lg:{ km: rec?24 : Math.min(32,26+wi*2), note:`E @${E},中段插入2x3km @M ${M};90分以上開始練補給` },
+    };
+  }
+  if (phase==="p3") {
+    const qualityLong = !rec && wi%2===0; // B週:品質放到長跑；A週:Friday做M、Sunday純E
+    const mKm=Math.min(16,10+wi*2);
+    const q1km=round1(3+6+3+1.5+2); // 2x3k T + 3x1k I + 慢跑恢復估算
+    if (!qualityLong) return {
+      q1:{ t:"Q1·T巡航+I", x:`熱身3km;2x3km T @${T} 休2分 + 3x1000m I @${I} 休2分;緩和2km${rf}`, v:"T+I混合", km:q1km },
+      q2:{ t:"Q2·M專項", x:`熱身2km;${rec?8:mKm}km 連續 @${M};收尾4x200m @R ${R};緩和1km${rf}`, v:`${rec?8:mKm}km@M`, km:round1(3+(rec?8:mKm)+0.8) },
+      lg:{ km: Math.min(rec?26:28+wi*2,32), note:`A週長跑全程 E @${E};本週M品質已放在Friday。上限2.5小時,超時就停;每40分補給` },
+    };
+    return {
+      q1:{ t:"Q1·T巡航+I", x:`熱身3km;2x3km T @${T} 休2分 + 3x1000m I @${I} 休2分;緩和2km`, v:"T+I混合", km:q1km },
+      q2:{ t:"Q2·E+步幅", x:`E 45-55分 @${E};末段6x20秒輕快步幅,完整恢復。本週專項品質留給Sunday長跑`, v:"50分E", km:round1(kmByMin(50,eMid)) },
+      lg:{ km:Math.min(30+wi,32), note:`B週品質長跑:前段 E @${E},末10km @M ${M};上限2.5小時,超時就停;完整演練補給` },
+    };
+  }
+  if (phase==="p4") {
+    const qualityLong = !rec && wi%2===0;
+    const tKm=round1(5 + kmByMin(40,P.t) + kmByMin(4,eMid));
+    if (!qualityLong) return {
+      q1:{ t:"Q1·T鞏固", x:`熱身3km;2x20分 T @${T} 休4分;緩和2km${rf} — T總量以不超過週跑量10%為原則`, v:"2x20分T", km:tKm },
+      q2:{ t:"Q2·M專項", x:`熱身2km;${rec?10:14}km @${M};收尾4x200m輕快;緩和1km${rf}`, v:`${rec?10:14}km@M`, km:round1(3+(rec?10:14)+0.8) },
+      lg:{ km:rec?24:28, note:`A週全程 E @${E};Friday已完成M專項,長跑只累積耐久與補給` },
+    };
+    return {
+      q1:{ t:"Q1·T鞏固", x:`熱身3km;2x20分 T @${T} 休4分;緩和2km`, v:"2x20分T", km:tKm },
+      q2:{ t:"Q2·E+步幅", x:`E 45分 @${E}+6x20秒步幅,完整恢復;把M專項留給Sunday`, v:"45分E", km:round1(kmByMin(45,eMid)) },
+      lg:{ km:28, note:`B週品質長跑:E @${E} 含3x3km @M ${M},組間1km E;演練比賽補給` },
+    };
+  }
+  if (phase==="taper") {
+    const last=wi>=2;
+    const reps=last?3:4;
+    const mKm=last?3:6;
+    return {
+      q1:{ t:"Q1·敏銳", x:`熱身2km;${reps}x1000m T @${T} 休2分;緩和2km`, v:`${reps}x1000T`, km:round1(4+reps*1.35) },
+      q2:{ t:"Q2·開合", x:`熱身2km;${mKm}km @M ${M};4x100m加速;緩和1km`, v:`${mKm}km@M`, km:round1(3+mKm+0.4) },
+      lg:{ km:last?10:16, note:`E @${E},保持腿部記憶；第二週明顯收量` },
+    };
+  }
   return null;
 }
 function mileage(phase, wiRaw, rec){
   const wi = Math.min(wiRaw, 4);
-  const base = { p1:[60,75], p2:[75,85], p3:[85,95], p4:[75,82], taper:[45,55] }[phase] || [50,60];
+  if (phase==="taper") return wi>=2 ? 32 : 50; // 兩週真正逐週下降
+  const base = { p1:[60,75], p2:[75,85], p3:[85,95], p4:[75,82] }[phase] || [50,60];
   const k = rec ? 0.72 : 1;
   return Math.round((base[0] + (base[1]-base[0])*Math.min(wi/3,1)) * k / 5)*5;
 }
@@ -208,7 +245,7 @@ export default function Sub3Plan(){
       <div style={{ maxWidth:760, margin:"0 auto", padding:"20px 16px 50px" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
           <div>
-            <h1 className="osw" style={{ fontSize:21, fontWeight:700, margin:0, color:C.main }}>Sub-3 全馬計畫 · Daniels VDOT</h1>
+            <h1 className="osw" style={{ fontSize:21, fontWeight:700, margin:0, color:C.main }}>Sub-3 全馬計畫 V2 · Daniels VDOT</h1>
             <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>目標 2:59:59 · M配速 4:15/km · 需VDOT≈{SUB3_VDOT}</div>
           </div>
           <button onClick={()=>setEditing(v=>!v)} style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:10, padding:"7px 10px", color:C.text, display:"flex", gap:5, alignItems:"center", cursor:"pointer", fontSize:12, flexShrink:0 }}>
@@ -266,7 +303,7 @@ export default function Sub3Plan(){
             </div>
             {V.bias && (
               <div style={{ fontSize:11, color:C.text, opacity:0.85 }}>
-                {V.bias==="speed" && "📊 速度型:短距離VDOT明顯高於長距離 → 課表已足量,重點吃滿Phase III/IV的M配速與長跑,別再加I課。"}
+                {V.bias==="speed" && "📊 速度型:短距離VDOT明顯高於長距離 → 重點吃滿Phase III/IV的M配速與長跑,別再加I課；M專項最快鎖4:15/km。"}
                 {V.bias==="endurance" && "📊 耐力型:長距離VDOT較高 → Phase II的R/I課是你的關鍵短板,務必保質完成。"}
                 {V.bias==="balanced" && "📊 均衡型:各距離VDOT一致,照表操課即可。"}
               </div>
@@ -278,7 +315,7 @@ export default function Sub3Plan(){
         {P && (
           <div className="mono" style={{ display:"flex", gap:6, flexWrap:"wrap", fontSize:11, marginBottom:10 }}>
             <Pc c={C.e} l="E" v={`${paceStr(P.eLo)}-${paceStr(P.eHi)}`}/>
-            <Pc c={C.m} l="M" v={paceStr(P.m)}/>
+            <Pc c={C.m} l="M專項" v={paceStr(Math.max(P.m,255))}/>
             <Pc c={C.t} l="T" v={paceStr(P.t)}/>
             <Pc c={C.i} l="I" v={`${paceStr(P.i)}(${Math.round(P.i)}s/km,千米${fmtHMS(P.i)})`}/>
             <Pc c={C.r} l="R" v={`${paceStr(P.r)}(400m ${Math.round(P.r*0.4)}s)`}/>
@@ -311,6 +348,14 @@ function PlanView({ plan, P, profile, sel, setSel, expanded, setExpanded, now })
   const km = week.race ? 0 : mileage(week.phase, week.wi, week.rest);
   const st = STRENGTH[week.phase];
   const E=`${paceStr(P.eLo)}-${paceStr(P.eHi)}`;
+  // 先扣除Q1/Q2/Long Run，再把剩餘里程分配給Wed/Thu/Sat，確保實際總量=顯示週量。
+  const fixedKm = week.race ? 0 : (q.q1.km + q.q2.km + q.lg.km);
+  const eRemain = Math.max(0, km - fixedKm);
+  const half=(x)=>Math.round(x*2)/2;
+  const e1=week.race?0:half(eRemain*0.32);
+  const e2=week.race?0:half(eRemain*0.38);
+  const e3=week.race?0:Math.max(0, Math.round((eRemain-e1-e2)*10)/10);
+  const actualKm=week.race?0:Math.round((fixedKm+e1+e2+e3)*10)/10;
 
   const items = week.race ? [] : [
     { day:"mon", rows:[{rest:true}] },
@@ -318,13 +363,13 @@ function PlanView({ plan, P, profile, sel, setSel, expanded, setExpanded, now })
       { id:"q1", color:C.i, icon:<Footprints size={13}/>, title:q.q1.t, vol:q.q1.v, detail:q.q1.x },
       { id:"st1", color:C.iron, icon:<Dumbbell size={13}/>, title:`重訓·${st.h}`, vol:"PM", detail:`${st.tue}(排在Q1之後至少6小時,同日集中壓力,讓E日真正輕鬆)` },
     ]},
-    { day:"wed", rows:[{ id:"e1", color:C.e, icon:<Footprints size={13}/>, title:"E 恢復跑", vol:`${Math.round(km*0.13)}km`, detail:`@${E},完全對話配速;晨間RHR比基準(${profile.rhr})高7bpm以上→縮短或休息` }] },
-    { day:"thu", rows:[{ id:"e2", color:C.e, icon:<Footprints size={13}/>, title:"E+步幅", vol:`${Math.round(km*0.15)}km`, detail:`@${E},末段6x20秒加速步幅(回走恢復)` }] },
+    { day:"wed", rows:[{ id:"e1", color:C.e, icon:<Footprints size={13}/>, title:"E 恢復跑", vol:`${e1}km`, detail:`@${E},完全對話配速;晨間RHR比基準(${profile.rhr})高7bpm以上→縮短或休息` }] },
+    { day:"thu", rows:[{ id:"e2", color:C.e, icon:<Footprints size={13}/>, title:"E+步幅", vol:`${e2}km`, detail:`@${E},末段6x20秒加速步幅(回走恢復)` }] },
     { day:"fri", rows:[
       { id:"q2", color:C.t, icon:<Footprints size={13}/>, title:q.q2.t, vol:q.q2.v, detail:q.q2.x },
       { id:"st2", color:C.iron, icon:<Zap size={13}/>, title:"神經刺激", vol:"PM/短", detail:st.fri },
     ]},
-    { day:"sat", rows:[{ id:"e3", color:C.e, icon:<Footprints size={13}/>, title:"E 輕鬆跑", vol:`${Math.round(km*0.12)}km`, detail:`@${E},為明日長跑保留` }] },
+    { day:"sat", rows:[{ id:"e3", color:C.e, icon:<Footprints size={13}/>, title:"E 輕鬆跑", vol:`${e3}km`, detail:`@${E},為明日長跑保留` }] },
     { day:"sun", rows:[{ id:"lg", color:C.gold, icon:<Footprints size={13}/>, title:"長跑", vol:`${q.lg.km}km`, detail:`${q.lg.note};每40分補給一次` }] },
   ];
 
@@ -352,7 +397,7 @@ function PlanView({ plan, P, profile, sel, setSel, expanded, setExpanded, now })
       <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10, flexWrap:"wrap", fontSize:11.5 }}>
         <span className="osw" style={{ fontSize:12, color:meta.color, fontWeight:700, textTransform:"uppercase", letterSpacing:1 }}>{meta.label}{week.rest?"·減量":""}</span>
         <span style={{ color:C.muted }}>{meta.note}</span>
-        {!week.race && <span className="mono" style={{ fontSize:10.5, color:C.main, marginLeft:"auto" }}>週量≈{km}km</span>}
+        {!week.race && <span className="mono" style={{ fontSize:10.5, color:C.main, marginLeft:"auto" }}>週量 {actualKm}km / 目標 {km}km</span>}
       </div>
 
       {week.race ? <RaceWeek P={P} dateFor={dateFor} weekN={week.n} raceDate={new Date(profile.raceDate+"T00:00:00")}/> : (
