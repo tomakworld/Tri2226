@@ -13,10 +13,10 @@ import { Waves, Bike as BikeIcon, Footprints, Dumbbell, Moon, ChevronLeft, Chevr
    比賽 2026-11-08 · 18週 · 游5000/騎205k/跑50k · 單車加強 · 跑步自主課表        */
 const FTP = 203, WEIGHT = 51;
 /* FTP:8/27實測20分平均210W(帶疲勞測),訓練基準採 203W
-   下次重測 W15(10/12那週),先完整完成W14 205km關鍵模擬;此為賽前最後一次FTP校準 */
+   下次重測 W15(10/12那週),先完整完成W14 關鍵長騎模擬;此為賽前最後一次FTP校準 */
 const FTP_TEST_WEEKS = { 15:"10/12當週(賽前最後一次FTP校準)" };
 /* 游泳校準:泳池單獨100m出發間隔2:30(游約2:15)、團練跟游2:10 → 泳池T-pace≈2:15
-   EN1連續游2:25-2:35 · EN2間隔2:40 · THR間隔2:30 · 比賽2:05靠防寒衣+跟游達成 */
+   EN1連續游2:25-2:35 · EN2間隔2:40 · THR間隔2:30 · 比賽目標2:08–2:12/100m；2:05僅防寒衣、跟游與水況均佳時可能達成 */
 
 /* 儲存層:Claude 環境用 window.storage,自架網站自動改用 localStorage */
 const store = {
@@ -43,7 +43,7 @@ const PHASES = {
   base:   { label:"基礎期",   color:C.water, note:"熱適應+有氧鞏固,單車量能直接拉高" },
   build1: { label:"強化期一", color:C.power, note:"FTP專項強化,Sweet Spot加量" },
   build2: { label:"強化期二", color:C.power, note:"長騎逼近比賽時長,Brick啟動" },
-  peak:   { label:"巔峰期",   color:C.red,   note:"180km模擬,最重訓練區塊" },
+  peak:   { label:"巔峰期",   color:C.red,   note:"維持強度＋關鍵長騎,吸收疲勞" },
   taper:  { label:"減量期",   color:C.green, note:"降量保強度,超補償" },
   race:   { label:"比賽週",   color:C.gold,  note:"Season,超長距離,去完成它!" },
 };
@@ -99,7 +99,7 @@ function gen(phase, wi, rec){
         ? {t:"VO2max 天花板刺激", x:`熱身20分 @${W(0.60)}-${W(0.70)}W;主課 5x3分 @${W(1.10)}-${W(1.15)}W,組間3分輕鬆;緩和15分。取代本週Tempo,不增加訓練日;若跑步品質課疲勞高則改回Z2`, v:"65分", tss:72}
         : {t:"Z2+Tempo收尾", x:`${bw}分 @${W(0.62)}-${W(0.72)}W,最後15分拉至 @${W(0.78)}-${W(0.83)}W(連續不休);跑步間歇在前,間隔4小時+`, v:`${bw}分`, tss:tss([[bw-15,0.65],[15,0.83]])},
       thu:{t:"閾值間歇", x:`熱身15分;主課 4x${bte}分 @${W(0.88)}-${W(0.91)}W(88-91%FTP,務必開風扇);息4分(約4:1,短休息練有氧天花板與乳酸排除);緩和10分`, v:`${15+4*bte+16+10}分`, tss:tss([[15,0.6],[4*bte,0.88],[16,0.5],[10,0.55]])},
-      sat:{t:"長騎有氧(功率為主)", x:`【鎖功率】全程維持 ${W(0.66)}-${W(0.69)}W,心率當護欄(上限145,超過且持續攀升就降到${W(0.60)}W完成時數);室內${r5(bs*0.85)}分/戶外${bs}分;每20分補水+電解質,每小時碳水60-70g(逐週腸胃訓練,耐受良好可往70-80g/h);每45分變化一次(低迴轉65rpm/站姿/高迴轉110rpm);【續航力】最後30分補 2x8分 ${W(0.75)}-${W(0.80)}W`, v:`${bs}分`, tss:tss([[bs-30,0.66],[16,0.78],[14,0.6]])},
+      sat:{t:"長騎有氧(功率為主)", x:`【鎖功率】全程維持 ${W(0.66)}-${W(0.69)}W,心率當護欄(上限145,超過且持續攀升就降到${W(0.60)}W完成時數);室內${r5(bs*0.85)}分/戶外${bs}分;每20分補水+電解質,每小時碳水70–80g，以訓練驗證的耐受量為準；尚未適應則逐週建立;每45分變化一次(低迴轉65rpm/站姿/高迴轉110rpm);【續航力】最後30分補 2x8分 ${W(0.75)}-${W(0.80)}W`, v:`${bs}分`, tss:tss([[bs-30,0.66],[16,0.78],[14,0.6]])},
     }};
   }
   if (phase==="build1"){
@@ -142,19 +142,19 @@ function gen(phase, wi, rec){
       { run:runOf(phase,28,false), swim:{
           tue:{t:"有氧維持", x:"熱身400m;技術6x50m;主課 6x200m EN2 出發間隔2:45 (游約2:25);緩和200m", v:"2200m"},
           fri:{t:"高強度閾值", x:"熱身400m;主課 6x300m 門檻 出發間隔2:35 (300m組:間隔7:45);緩和200m", v:"2600m"},
-          sun:{t:"長泳✕配速", x:"連續3200m 輕鬆2:30/100m,後1000m抓2:15(比賽日防寒衣+跟游自然到2:05);緩和200m", v:"3400m"} },
+          sun:{t:"長泳✕配速", x:"連續3200m 輕鬆2:30/100m,後1000m抓2:15(比賽目標2:08–2:12/100m,依水況調整);緩和200m", v:"3400m"} },
         bike:{
-          wed:{t:"Z2+Sweet Spot", x:`100分 @${W(0.62)}-${W(0.72)}W,中段2x15分 @${W(0.90)}-${W(0.93)}W(90-93%FTP),組間休5分 @${W(0.55)}-${W(0.65)}W`, v:"100分", tss:92},
+          wed:{t:"Z2耐力·Peak收量", x:`60分 @${W(0.60)}-${W(0.70)}W,純Z2；把恢復留給週四維持課與週六5小時長騎`, v:"60分", tss:tss([[60,0.65]])},
           thu:{t:"FTP維持", x:`熱身15分;主課 2x15分 @${W(0.92)}-${W(0.95)}W;息6分;緩和10分。巔峰期不再追FTP進步,保留強度把恢復留給週六長騎`, v:"71分", tss:67},
-          sat:{t:"前哨長騎+Brick", x:`【鎖比賽功率】全程 ${W(0.68)}-${W(0.72)}W,心率護欄148;戶外300分優先/室內255分;室內版拆3x80分區塊,區塊間下車補給5分;每小時碳水70g;下車接30分超鐵配速跑(5:35-6:00)`, v:"5hr+30分", tss:280} } },
+          sat:{t:"前哨長騎+Brick", x:`【鎖比賽功率】全程 ${W(0.68)}-${W(0.72)}W,心率護欄148;戶外300分優先/室內255分;室內版拆3x80分區塊,區塊間下車補給5分;每小時碳水70–80g(以訓練驗證耐受量為準);下車接30分超鐵配速跑(5:35-6:00)`, v:"5hr+30分", tss:280} } },
       { key:true, run:runOf(phase,14,false), swim:{
           tue:{t:"量能維持", x:"熱身400m;主課 5x200m EN2 出發間隔2:45 (游約2:25);緩和200m", v:"2000m"},
           fri:{t:"高強度閾值", x:"熱身400m;主課 5x300m 門檻 出發間隔2:35 (300m組:間隔7:45);緩和200m", v:"2500m"},
-          sun:{t:"🔑長泳關鍵", x:"連續3600m,全程抓2:12-2:15/100m(比賽日等效2:05),完整演練補給;緩和200m", v:"3800m"} },
+          sun:{t:"🔑長泳關鍵", x:"連續3600m,全程抓2:12-2:15/100m(比賽目標2:08–2:12/100m),完整演練補給;緩和200m", v:"3800m"} },
         bike:{
           wed:{t:"恢復迴轉", x:`50分 @${W(0.50)}-${W(0.62)}W`, v:"50分", tss:28},
           thu:{t:"FTP維持·關鍵長騎週", x:`熱身15分;主課 2x10分 @${W(0.90)}-${W(0.95)}W;息6分;緩和10分。只維持神經與閾值感,不得製造殘留疲勞`, v:"61分", tss:52},
-          sat:{t:"🔑205km關鍵+Brick", x:`【比賽全模擬】鎖功率 ${W(0.68)}-${W(0.72)}W全程,心率護欄150;務必戶外(6小時室內練不到實路操控/風阻/補給動作),345-375分;完整演練比賽日補給(目標70-80g/h碳水,以已訓練耐受量為準)與裝備;下車接40分超鐵配速跑 — 最重單日`, v:"6hr+40分", tss:330} } },
+          sat:{t:"🔑關鍵模擬+Brick", x:`【Race Power durability】全程 ${W(0.68)}-${W(0.72)}W,心率護欄150；戶外優先，5:45–6:15（345–375分），170–190km為正常範圍。只有路線、天氣、恢復與補給均良好時才選做205km；不為湊里程延長時間或加功率。完整演練空力姿勢、裝備、補給（訓練驗證的70–80g/h碳水），記錄前後半功率/心率與Pw:HR；下車接40分輕鬆Brick，疲勞高則縮短或取消`, v:"345–375分+40分Brick", tss:tss([[360,0.70]])} } },
       { run:runOf(phase,20,false), swim:{
           tue:{t:"量能收斂", x:"熱身400m;主課 4x200m EN2 出發間隔2:45 (游約2:25);緩和200m", v:"1800m"},
           fri:{t:"閾值維持", x:"熱身400m;主課 4x250m 門檻 出發間隔2:35;緩和200m", v:"1800m"},
@@ -192,6 +192,9 @@ const push = (phase, count) => {
   for (let wi=1; wi<=count; wi++){
     const rec = ["base","build1","build2"].includes(phase) && wi===count && count>=3;
     const g = gen(phase, wi, rec);
+    if (/VO2/.test(g.bike.wed.t)) {
+      g.bike.thu = {t:"Z2恢復耐力", x:`50分 @${W(0.56)}-${W(0.65)}W，昨天VO2為本週單車主品質課；今天不做FTP/TTE`, v:"50分", tss:tss([[50,0.60]])};
+    }
     WEEKS.push({ n: idx++, phase, rest: rec, key: !!g.key, ...g });
   }
 };
@@ -202,7 +205,7 @@ const STRENGTH = {
   base:"肌力基礎:3-4組x8-10下,單邊+核心,每週+3-5%",
   build1:"最大肌力:主項4-6RM,3-4組,組間休2-3分",
   build2:"最大肌力+爆發啟蒙:4-6RM+登箱跳2-3組x5",
-  peak:"肌力維持:主項2組x3-5(約80-85%1RM)+低量爆發2組x4-5;不追PR,205k關鍵週可取消下肢",
+  peak:"肌力維持:主項2組x3-5(約80-85%1RM)+低量爆發2組x4-5;不追PR,關鍵長騎週可取消下肢",
   taper:"神經活化:極輕高速2組x5,賽前一週跳過",
   race:"賽前活化:動態熱身10分內或跳過",
 };
@@ -237,7 +240,7 @@ export default function SeasonPlan(){
   const isTestWeek = !!FTP_TEST_WEEKS[week.n];
   const isLongWeek = !week.race;
   const phase = PHASES[week.phase];
-  const bikeTss = week.race ? 0 : (week.bike.wed.tss+week.bike.thu.tss+week.bike.sat.tss);
+  const bikeTss = week.race ? 0 : isTestWeek ? "待實測" : (week.bike.wed.tss+week.bike.thu.tss+week.bike.sat.tss);
   const month = dateFor(week.n,"mon").getMonth()+1;
   const RC = { wed:C.red, thu:C.green, fri:C.red, sat:C.green, sun:C.gold };
 
@@ -251,13 +254,13 @@ export default function SeasonPlan(){
         ? mk(<BikeIcon size={13}/>,C.water,{t:"測驗前減壓",v:"30分·TSS15",x:`30分鐘 @${W(0.45)}-${W(0.55)}W 純輕鬆迴轉,迴轉數95-105,不做任何強度 — 明日FTP測驗,今天的任務是讓腿完全新鮮。跑步也建議只做輕鬆跑或休息。`},"wed-b")
         : mk(<BikeIcon size={13}/>,C.power,{...week.bike.wed,v:`${week.bike.wed.v}·TSS${week.bike.wed.tss}`},"wed-b") ] },
     { day:"thu", items:[ {run:"thu"}, isTestWeek
-        ? mk(<BikeIcon size={13}/>,C.red,{t:"🔬 FTP 重測",v:"約60分",x:`熱身20分(含3x1分加速);20分鐘全力測驗(前2分別衝過頭,找到能撐滿20分的最大穩定輸出);緩和15分。取20分平均功率×0.95=新FTP。測驗當天週三課降為30分輕鬆迴轉、前一晚睡飽。這是11/8賽前最後一次FTP測驗。W14先完成205km關鍵模擬，W15週四在恢復正常時測；測完更新後續功率區間。若W14疲勞尚未吸收，寧可取消測驗、不硬測。現行FTP ${FTP}W → 目標區間 ${W(1.02)}-${W(1.08)}W`},"thu-test")
+        ? mk(<BikeIcon size={13}/>,C.red,{t:"🔬 FTP 重測",v:"約60分",x:`熱身20分(含3x1分加速);20分鐘全力測驗(前2分別衝過頭,找到能撐滿20分的最大穩定輸出);緩和15分。取20分平均功率×0.95=新FTP。測驗當天週三課降為30分輕鬆迴轉、前一晚睡飽。這是11/8賽前最後一次FTP測驗。W14先完成關鍵長騎模擬，W15週四在恢復正常時測；測完更新後續功率區間。若W14疲勞尚未吸收，寧可取消測驗、不硬測。現行FTP ${FTP}W → 目標區間 ${W(1.02)}-${W(1.08)}W`},"thu-test")
         : mk(<BikeIcon size={13}/>,C.power,{...week.bike.thu,v:`${week.bike.thu.v}·TSS${week.bike.thu.tss}`},"thu-b") ] },
     { day:"fri", items:[ {run:"fri"}, isTestWeek
         ? mk(<Waves size={13}/>,C.water,{t:"測驗後恢復游",v:"1200m",x:"熱身300m;主課 6x100m EN2 出發間隔2:45;緩和300m。昨日力竭測驗,今天只求活動度與血流,不做閾值。"},"fri-sw")
         : mk(<Waves size={13}/>,C.water,week.swim.fri,"fri-sw") ] },
     { day:"sat", items:[ {run:"sat"}, isTestWeek
-        ? mk(<BikeIcon size={13}/>,C.power,{t:"FTP測驗後恢復長騎",v:"120–150分·低Z2",x:`連續120–150分鐘 @${W(0.58)}-${W(0.68)}W；不做Race Power、不追TSS。W14已完成205km關鍵模擬，本週任務是取得乾淨FTP數據並吸收疲勞。`},"sat-b")
+        ? mk(<BikeIcon size={13}/>,C.power,{t:"FTP測驗後恢復長騎",v:"120–150分·低Z2",x:`連續120–150分鐘 @${W(0.58)}-${W(0.68)}W；不做Race Power、不追TSS。W14已完成關鍵長騎模擬，本週任務是取得乾淨FTP數據並吸收疲勞。`},"sat-b")
         : mk(<BikeIcon size={13}/>,C.power,{...week.bike.sat,v:`${week.bike.sat.v}·TSS${week.bike.sat.tss}`},"sat-b") ] },
     { day:"sun", items:[ {run:"sun"}, mk(<Waves size={13}/>,C.water,week.swim.sun,"sun-sw") ] },
   ];
@@ -274,9 +277,9 @@ export default function SeasonPlan(){
       <div style={{ maxWidth:760, margin:"0 auto", padding:"20px 16px 50px" }}>
         {/* header */}
         <div style={{ marginBottom:12 }}>
-          <h1 className="osw" style={{ fontSize:22, fontWeight:700, margin:0, color:C.water }}>Season · 超長距離 5k/205k/50k</h1>
+          <h1 className="osw" style={{ fontSize:22, fontWeight:700, margin:0, color:C.water }}>Season V3.2 · 超長距離 5k/205k/50k</h1>
           <div style={{ fontSize:11.5, color:C.muted, marginTop:3 }}>
-            2026/11/8 比賽 · FTP {FTP}W（{(FTP/WEIGHT).toFixed(2)} W/kg,恢復力佳）· 全馬3:20 · 泳池單獨T≈2:15/100m·海泳目標2:05(防寒衣+跟游,拆分約1:20-1:25) · 226跑段 5:19-5:39/km · 單車加強版 · 倒數 {N-sel>0?`${N-sel}週`:"本週"}
+            2026/11/8 比賽 · FTP {FTP}W（{(FTP/WEIGHT).toFixed(2)} W/kg,恢復力佳）· 全馬3:20 · 泳池單獨T≈2:15/100m·海泳目標2:08–2:12/100m(5km約1:47–1:50) · 226跑段 5:19-5:39/km · 單車加強版 · 倒數 {N-sel>0?`${N-sel}週`:"本週"}
           </div>
         </div>
 
@@ -286,7 +289,7 @@ export default function SeasonPlan(){
           <span style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:6, padding:"2px 7px", color:C.gold }}>比賽 {W(0.68)}-{W(0.72)}W</span>
           <span style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:6, padding:"2px 7px", color:C.water }}>游EN2 間隔2:40</span>
           <span style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:6, padding:"2px 7px", color:C.water }}>游THR 間隔2:30</span>
-          <span style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:6, padding:"2px 7px", color:C.gold }}>游泳池2:15→賽2:05</span>
+          <span style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:6, padding:"2px 7px", color:C.gold }}>泳池2:15→比賽2:08–2:12</span>
         </div>
 
         {/* week strip */}
@@ -318,13 +321,13 @@ export default function SeasonPlan(){
           <span style={{ color:C.muted }}>{phase.note}</span>
           <span style={{ color:C.muted }}>|</span>
           <span style={{ color:C.muted, display:"flex", gap:4, alignItems:"center" }}><Sun size={11}/>{climate(month)}</span>
-          {isTestWeek && <span style={{ fontSize:11, color:C.red, fontWeight:600 }}>🔬 本週四 FTP 重測：W14 205km模擬後先吸收疲勞；二重訓減量·三輕鬆迴轉·五恢復游·六低Z2。這是11/8前最後一次FTP校準</span>}
+          {isTestWeek && <span style={{ fontSize:11, color:C.red, fontWeight:600 }}>🔬 本週四 FTP 重測：W14關鍵長騎模擬後先吸收疲勞；二重訓減量·三輕鬆迴轉·五恢復游·六低Z2。這是11/8前最後一次FTP校準</span>}
           {!week.race && <span className="mono" style={{ fontSize:10.5, color:C.power, marginLeft:"auto" }}>騎TSS≈{bikeTss}</span>}
         </div>
 
         {!week.race && (
           <div style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:10, padding:"8px 11px", marginBottom:10, fontSize:11, lineHeight:1.55, color:C.muted }}>
-            <b style={{ color:C.water }}>室內長課三要件</b>：①散熱 — 兩台風扇(上身+腿)、室溫≤24°C、每20分補水;8月實測第2-3小時掉10W多為熱負荷所致 ②補給 — 每小時碳水60-70g(逐週腸胃訓練,耐受良好可往70-80g/h),長課前後量體重,掉超過2%代表補水不足 ③監控 — 記錄Pw:HR脫鉤值(目標&lt;5%)、前後半平均功率/心率與分段EF;同功率下心率更低、或同心率下功率提升,代表durability進步。
+            <b style={{ color:C.water }}>室內長課三要件</b>：①散熱 — 兩台風扇(上身+腿)、室溫≤24°C、每20分補水;8月實測第2-3小時掉10W多為熱負荷所致 ②補給 — 每小時碳水70–80g，以訓練驗證的耐受量為準；尚未適應則逐週建立,長課前後量體重,掉超過2%代表補水不足 ③監控 — 記錄Pw:HR脫鉤值(目標&lt;5%)、前後半平均功率/心率與分段EF;同功率下心率更低、或同心率下功率提升,代表durability進步。
           </div>
         )}
         {week.race ? <RaceWeek/> : (
@@ -404,8 +407,8 @@ function RaceWeek(){
       <div style={{ border:`1.5px solid ${C.gold}`, borderRadius:12, padding:"12px 14px", background:"rgba(168,127,0,0.08)" }}>
         <div style={{ fontWeight:700, fontSize:14, marginBottom:6, display:"flex", gap:6, alignItems:"center" }}><Flag size={15} color={C.gold}/>日 11/8 — Season 的超長距離比賽日</div>
         <div style={{ fontSize:12.5, lineHeight:1.7 }}>
-          <div><b style={{ color:C.water }}>游 5.0k</b>：2:08-2:12/100m(約1:47-1:55)—配速務必保守,防寒衣+跟游是關鍵,後段避免肩膀掉速</div>
-          <div><b style={{ color:C.power }}>騎 205k</b>：{W(0.68)}-{W(0.72)}W(68-72%FTP,約6.5-7hr),每15分補給,每小時60g+碳水</div>
+          <div><b style={{ color:C.water }}>游 5.0k</b>：2:08–2:12/100m(約1:47–1:50)—配速務必保守,防寒衣+跟游是關鍵,後段避免肩膀掉速</div>
+          <div><b style={{ color:C.power }}>騎 205k</b>：{W(0.68)}-{W(0.72)}W(68-72%FTP,約6.5-7hr),每15分補給,每小時70–80g碳水(以訓練驗證耐受量為準)</div>
           <div><b style={{ color:C.red }}>跑 50k</b>：5:35-6:00/km,前15km嚴格壓慢,後段允許走補給站策略</div>
         </div>
         <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>加油,去完成它!🎉</div>

@@ -21,7 +21,7 @@ const PHASES = {
   base:   { label: "基礎期",   color: C.water, note:"鞏固有氧與技術" },
   build1: { label: "強化期一", color: C.power, note:"提升FTP與閾值" },
   build2: { label: "強化期二", color: C.power, note:"長課逼近比賽時長" },
-  peak:   { label: "巔峰期",   color: C.red,   note:"180km模擬・專項刺激" },
+  peak:   { label: "巔峰期",   color: C.red,   note:"維持強度・關鍵長騎" },
   taper:  { label: "減量期",   color: C.green, note:"降量保強度・超補償" },
   race:   { label: "比賽週",   color: C.gold,  note:"最終確認・祝完賽順利" },
 };
@@ -54,7 +54,7 @@ function decodeProfile(str){
    3) localStorage (normal browser fallback)
    Saving writes to BOTH storage layers when available and keeps ?d= updated.
 ---------------------------------------------------------------- */
-const PROFILE_KEY = "athlete:profile:v4";
+const PROFILE_KEY = "athlete:profile:v4"; // V5 deliberately retains the V4 key for seamless migration.
 async function loadSavedProfile(){
   // URL payload is the most portable source and works across devices/bookmarks.
   try {
@@ -144,7 +144,8 @@ function predictSplits(profile, dist){
   const tp = parseMS(profile.tpace), hm = parseHMM(profile.hm), ftp = +profile.ftp;
   if (!tp || !hm || !ftp) return null;
   const swim = tp * 1.10 * (dist.sw*10);
-  const v = Math.pow((ftp * (dist.bikeIF[0]+dist.bikeIF[1])/2) / 0.0061, 1/3);
+  const raceIF = raceIFFor(profile, dist);
+  const v = Math.pow((ftp * (raceIF[0]+raceIF[1])/2) / 0.0061, 1/3);
   const bike = dist.bk / v * 3600;
   const run = dist.id==="113" ? hm + 13*60 : hm*2.085 + 38*60;
   return { s:swim, b:bike, r:run };
@@ -401,81 +402,161 @@ function genSwimBike(phase, wiRaw, rec, dist, A) {
   return T[Math.min(wi-1, 1)];
 }
 
-/* ---------------- run generator ---------------- */
-function genRun(phase, wiRaw, rec, rp, key, dist, A) {
-  const wi = Math.min(wiRaw, 5);
-  const rf = A?.br?.runFactor || 1;
-  const kk = (dist && dist.id==="113" ? 0.8 : 1) * (A?.volumeFactor || 1) * rf;
-  const qk = (A?.qualityFactor || 1) * clamp(rf,0.96,1.05);
-  const capLong = dist && dist.id==="113" ? 24 : 30;
-  const secStr = (t) => t>=60 ? `${Math.floor(t/60)}:${String(Math.round(t%60)).padStart(2,"0")}` : `${Math.round(t)}秒`;
-  const REP = (m, lo, hi) => rp ? `(每趟 ${secStr(lo*m/1000)}${hi&&hi!==lo?`-${secStr(hi*m/1000)}`:""})` : "";
-  const P = (a) => rp ? `${paceStr(a)}/km` : "自覺強度";
-  const PR = (a,b) => rp ? `${paceStr(a)}-${paceStr(b)}/km` : "自覺強度";
-  const easy = rp ? PR(rp.easy[0], rp.easy[1]) : "對話配速";
-  const lng = rp ? PR(rp.long[0], rp.long[1]) : "中等有氧";
-  const mp = rp ? P(rp.mp) : "全馬配速";
-  const thr = rp ? P(rp.thr) : "閾值";
-  const itv = rp ? PR(rp.itv[0], rp.itv[1]) : "間歇";
-  const im = rp ? PR(rp.im[0], rp.im[1]) : "226配速";
-  const easyRun = { t:"輕鬆跑", x:`30-45分 @${easy},純恢復`, v:"30-45分" };
-
-  if (phase === "base") {
-    const lk = Math.round((rec ? 14 : 16 + wi*2)*kk);
-    return {
-      wed:{ t:"間歇", x:`熱身2km;${rec?6:Math.max(6,Math.round((8+wi)*qk))}x400m ${rp?`目標 ${secStr(rp.itv[0]*0.4)}-${secStr(rp.itv[1]*0.4)}/趟`:"間歇強度"} 慢跑200m恢復;緩和1km`, v:`${rec?6:Math.max(6,Math.round((8+wi)*qk))}x400m` },
-      thu: easyRun,
-      fri:{ t:"速度節奏", x:`熱身2km;${rec?6:Math.max(6,Math.round(10*qk))}x300m ${rp?`目標 ${secStr(rp.itv[0]*0.3)}-${secStr(rp.itv[1]*0.3)}/趟`:"間歇強度"} +100m慢;緩和1km`, v:`${rec?6:Math.max(6,Math.round(10*qk))}x300m` },
-      sat: easyRun,
-      sun:{ t:"長跑", x:`${lk}km:前2/3 @${lng} 漸速至 ${mp},末1/3 @${im} 練節奏轉換`, v:`${lk}km` },
-    };
-  }
-  if (phase === "build1") {
-    const lk = Math.round((rec ? 16 : 21 + wi*2)*kk);
-    return {
-      wed:{ t:"間歇", x:`熱身2km;${rec?3:Math.max(3,Math.round(5*qk))}x1000m ${rp?`目標 ${secStr(rp.thr)}/趟`:"閾值"} 休2分;緩和1km`, v:`${rec?3:Math.max(3,Math.round(5*qk))}x1000m` },
-      thu: easyRun,
-      fri:{ t:"節奏跑", x:`熱身2km;${rec?15:Math.round((20+wi*5)*qk)}分連續 @${thr};緩和1km`, v:`${rec?15:Math.round((20+wi*5)*qk)}分` },
-      sat: easyRun,
-      sun:{ t:"長跑", x:`${lk}km @${lng},中段3x2km @${mp};每40分補給`, v:`${lk}km` },
-    };
-  }
-  if (phase === "build2") {
-    const lk = Math.min(Math.round((rec ? 18 : 24 + wi*2)*kk), capLong);
-    return {
-      wed:{ t:"巡航間歇", x:`熱身2km;${rec?2:3}x2000m ${rp?`目標 ${secStr(rp.thr*2)}/趟`:"閾值"} 休90秒;緩和1km`, v:`${rec?2:3}x2km` },
-      thu: easyRun,
-      fri:{ t:"配速跑", x:`熱身2km;${rec?8:10+wi}km @${mp};緩和1km`, v:`${rec?8:10+wi}km` },
-      sat: easyRun,
-      sun:{ t:"長跑", x:`${lk}km:@${lng} 為主,末8km @${im},演練補給`, v:`${lk}km` },
-    };
-  }
-  if (phase === "peak") {
-    if (key) return {
-      wed:{ t:"配速維持", x:`熱身2km;2x3km ${rp?`目標 ${secStr(rp.mp*3)}/趟`:"全馬配速"} 休2分;緩和1km`, v:"2x3km" },
-      thu: easyRun,
-      fri:{ t:"226配速", x:`熱身1km;6km @${im};緩和1km`, v:"6km" },
-      sat: easyRun,
-      sun:{ t:"短長跑", x:`昨日負荷大,僅14km @${easy}`, v:"14km" },
-    };
-    return {
-      wed:{ t:"配速維持", x:`熱身2km;2x3km ${rp?`目標 ${secStr(rp.mp*3)}/趟`:"全馬配速"} 休2分+4x100m加速;緩和1km`, v:"2x3km" },
-      thu: easyRun,
-      fri:{ t:"226配速", x:`熱身1km;8-10km @${im},末2km提至 ${mp};緩和1km`, v:"8-10km" },
-      sat: easyRun,
-      sun:{ t:"長跑", x:`${Math.round((wi===1?28:20)*kk)}km @${lng},末6km @${im}`, v:`${Math.round((wi===1?28:20)*kk)}km` },
-    };
-  }
-  const last = wi >= 2;
-  return {
-    wed:{ t:"神經喚醒", x:`熱身2km;${last?4:6}x200m ${rp?`目標 ${secStr(rp.itv[0]*0.2)}-${secStr(rp.itv[1]*0.2)}/趟`:"輕快"};緩和1km`, v:`${last?4:6}x200m` },
-    thu:{ t:"輕鬆跑", x:`${last?20:30}分 @${easy}`, v:`${last?20:30}分` },
-    fri:{ t:"開合跑", x:`熱身1km;${last?3:4}km @${im};緩和1km`, v:`${last?3:4}km` },
-    sat:{ t:"輕鬆跑", x:`20-30分 @${easy}+4x60m加速`, v:"20-30分" },
-    sun:{ t:"中短長跑", x:`${last?8:12}km @${easy}`, v:`${last?8:12}km` },
-  };
+/* V5: every displayed workout has a total duration, including warm-up,
+   recoveries and cool-down. Time blocks, not distance estimates, are binding.
+   IF and frequency rules are conservative coaching heuristics, not predictions. */
+function raceIFFor(profile, dist) {
+  const br = bikeRunModel(profile, dist);
+  const experienced = ["113","226","multi"].includes(profile.triExp);
+  const competitive = ["pb","ag"].includes(profile.goalType);
+  let low = dist.id === "226" ? 0.65 : 0.73;
+  if (experienced) low += 0.02;
+  if (experienced && competitive) low += 0.01;
+  if (br.bikeDur >= 0.95 && br.runDur >= 0.90 && br.hmPace && br.hmPace <= 330) low += 0.01;
+  if (br.bikeDur < 0.65) low -= 0.02;
+  if (br.runDur < 0.65 || !br.hmPace || br.hmPace > 360 || br.delta > 0.18) low -= 0.01;
+  low = Math.round(clamp(low, dist.id === "226" ? 0.60 : 0.68, dist.id === "226" ? 0.70 : 0.80)*100)/100;
+  return [low, Math.round((low+0.03)*100)/100];
 }
-
+function budgetMinutes(profile) {
+  const h = Number(profile.weekHours);
+  return Number.isFinite(h) && h >= 0 && profile.weekHours !== "" && profile.weekHours != null
+    ? Math.floor(h*60) : 480;
+}
+function runPolicy(profile, dist) {
+  const novice = !["113","226","multi"].includes(profile.triExp);
+  const competitive = ["pb","ag"].includes(profile.goalType);
+  const established = (+profile.curRunKm||0) >= (dist.id === "226" ? 35 : 25)
+    && (+profile.longRunKm||0) >= (dist.id === "226" ? 18 : 12);
+  const advanced = !novice && competitive && established;
+  return { novice, advanced, days: advanced ? 5 : novice && dist.id === "113" ? 3 : 4,
+    quality: novice || !established || profile.goalType === "finish" ? 0 : advanced ? 2 : 1 };
+}
+function workoutMinutes(v) {
+  const m = /^(\d+(?:\.\d+)?)(hr|分)/.exec(v);
+  if (!m) throw new Error(`Missing bike duration: ${v}`);
+  return Math.round(+m[1]*(m[2] === "hr" ? 60 : 1));
+}
+function writeSession(s, minutes = s.minutes) {
+  const m = Math.max(0, Math.floor(minutes));
+  s.minutes = m;
+  s.v = `${m}分`;
+  if (!m) { s.t = "本週省略"; s.x = "時間預算不足，本週省略此課。"; s.tss = 0; return s; }
+  const warm = Math.min(s.sport === "bike" ? 10 : 8, Math.floor(m/4));
+  const cool = Math.min(5, Math.floor(m/5));
+  const main = m-warm-cool;
+  if (s.sport === "swim") {
+    const technique = Math.min(10, Math.floor(main/3));
+    s.x = `總計${m}分：熱身${warm}分 {EN1}；技術${technique}分（流線、划水、換氣）；主課${main-technique}分 ${s.intensity || "{EN2}"}，每50–200m短休15–20秒，休息包含在主課時間內；緩和${cool}分。時間到即結束，不追里程。`;
+    s.tss = 0;
+  } else if (s.sport === "strength") {
+    s.x = `總計${m}分（含熱身、組間休息）：${s.strengthText}。按時間刪減輔助動作或組數，不壓縮必要休息，時間到即結束。`;
+    s.tss = 0;
+  } else if (s.kind === "quality" && main >= (s.sport === "bike" ? 12 : 8)) {
+    const recovery = s.recovery || 3;
+    const reps = Math.min(s.reps, Math.max(1, Math.floor((main+recovery)/(s.block+recovery))));
+    const block = Math.min(s.block, Math.floor((main-(reps-1)*recovery)/reps));
+    const easy = main-reps*block-(reps-1)*recovery;
+    s.x = `總計${m}分：熱身${warm}分；${reps}×${block}分 ${s.intensity}，組間${recovery}分輕鬆（共${reps-1}次）；另${easy}分輕鬆；緩和${cool}分。品質下降就提早結束。`;
+    s.tss = s.sport === "bike" ? tssCalc([[m-reps*block,0.60],[reps*block,s.ifValue]]) : 0;
+  } else {
+    if (s.kind === "quality") { s.kind = "easy"; s.t = "輕鬆恢復"; s.intensity = s.sport === "bike" ? "@{P:0.56-0.65}" : "對話配速"; }
+    s.x = `總計${m}分：熱身${warm}分；${main}分 ${s.intensity || "對話配速"}；緩和${cool}分。${s.note || ""}`;
+    s.tss = s.sport === "bike" ? tssCalc([[warm+cool,0.55],[main,s.ifValue || 0.62]]) : 0;
+  }
+  return s;
+}
+function prepareWeek(week, profile, dist, A) {
+  const w = {...week, swim:{}, bike:{}, run:{}, strength:{}};
+  const policy = runPolicy(profile, dist);
+  const rp = runPaces(profile.hm, dist);
+  const raceIF = raceIFFor(profile, dist);
+  const racePower = `Race Power @{P:${raceIF[0]}-${raceIF[1]}}`;
+  const isPeak = w.phase === "peak", taper = w.phase === "taper";
+  const vo2 = !w.rest && !policy.novice && ((w.phase === "base" || w.phase === "build1") && w.wi === 3 || w.phase === "build2" && w.wi === 2);
+  for (const day of ["tue","fri","sun"]) {
+    const old = week.swim[day];
+    // A generous rest/technical allowance converts old distance templates to
+    // an initial time allocation. The resulting timed prescription is final.
+    const pace = (parseMS(profile.tpace) || 150)+25;
+    const minutes = Math.ceil(parseFloat(old.v)/100*pace/60*1.15);
+    w.swim[day] = writeSession({sport:"swim", t:old.t, minutes, kind:"easy", priority:day === "sun" ? 4 : 3,
+      intensity:day === "fri" && !policy.novice && !w.rest ? "{THR}" : "{EN2}"});
+  }
+  for (const day of ["wed","thu","sat"]) {
+    let minutes = workoutMinutes(week.bike[day].v);
+    let s = {sport:"bike", t:week.bike[day].t, minutes, kind:"easy", intensity:"@{P:0.60-0.70}", ifValue:0.65, priority:1};
+    if (day === "thu") {
+      const match = /(?:主課 )?(\d+)x(\d+)分/.exec(week.bike[day].x);
+      s = {...s,kind:"quality",priority:4,reps:match ? +match[1] : 2,block:match ? +match[2] : 10,recovery:5,intensity:"@{P:0.90-0.95}",ifValue:0.925};
+    }
+    if (day === "wed") {
+      s.t = "Z2有氧";
+      if (vo2) s = {...s,t:"VO2天花板刺激",minutes:55,kind:"quality",priority:4,reps:4,block:3,recovery:3,intensity:"@{P:1.05-1.10}",ifValue:1.075};
+    }
+    if (day === "thu" && vo2) s = {...s,t:"VO2後Z2恢復",minutes:45,kind:"easy",priority:1,intensity:"@{P:0.56-0.65}",ifValue:0.60,note:"昨天VO2是本週單車主品質課。"};
+    if (isPeak && dist.id === "226") {
+      if (day === "wed") s = {...s,t:"Peak Z2收量",minutes:w.wi === 1 ? 60 : 40};
+      if (day === "thu") s = {...s,t:"FTP維持",minutes:w.wi === 1 ? 60 : 50,reps:2,block:w.wi === 1 ? 15 : 10,recovery:5};
+    }
+    if (taper && day === "thu") s = {...s,t:"短強度維持",reps:3,block:2,recovery:3};
+    if (day === "sat") {
+      s = {...s,kind:"long",priority:6,t:w.key ? "🔑關鍵長騎" : "長騎耐力",intensity:isPeak || w.phase === "build2" ? racePower : "@{P:0.62-0.70}",ifValue:isPeak || w.phase === "build2" ? (raceIF[0]+raceIF[1])/2 : 0.66,
+        note:"戶外優先；演練空力姿勢與已耐受的補給，監控後半功率及心率；依時間完成，不強制騎滿比賽里程。"};
+      if (isPeak && dist.id === "226") s.minutes = [270,330,150][Math.min(w.wi-1,2)];
+      // Conservative duration ceiling using recent longest ride as a proxy;
+      // absent durability data cannot unlock a full key ride.
+      const knownLong = (+profile.longBikeKm||0)/25*60;
+      s.minutes = Math.min(s.minutes, Math.max(90, Math.round(knownLong*(1+Math.min(w.n,16)*0.04))));
+    }
+    w.bike[day] = writeSession(s);
+  }
+  const brick = !w.rest && (w.phase === "build2" && w.wi >= 2 || isPeak && w.wi <= 2);
+  const runDays = policy.days === 3 ? ["wed",brick ? "sat" : "fri","sun"] : policy.days === 4 ? ["wed","fri","sat","sun"] : ["wed","thu","fri","sat","sun"];
+  const qualityDays = w.rest || vo2 || w.key || policy.novice || taper ? [] : policy.quality === 2 && !isPeak ? ["wed","fri"] : policy.quality ? ["wed"] : [];
+  for (const day of runDays) {
+    let minutes = taper ? (w.wi >= 2 ? 20 : 30) : Math.max(20,round5(35*A.volumeFactor*A.br.runFactor));
+    let s = {sport:"run",kind:"easy",t:"輕鬆跑",minutes,intensity:"對話配速（可跑走）",priority:1};
+    if (qualityDays.includes(day)) s = {...s,t:"閾值維持",kind:"quality",minutes:45,reps:3,block:5,recovery:2,intensity:rp ? `@${paceStr(rp.thr)}/km，依體感下修` : "穩定節奏，保留餘裕",priority:day === "fri" ? 2 : 4};
+    if (day === "sun") {
+      const current = (+profile.longRunKm||0)*(rp ? rp.easy[1]/60 : 7);
+      const maxLong = dist.id === "226" ? 150 : 105;
+      minutes = Math.min(maxLong,Math.max(40,Math.round(current*(1+Math.min(w.n,16)*0.025))));
+      if (w.rest || w.key) minutes = Math.round(minutes*0.65);
+      if (taper) minutes = Math.min(minutes,w.wi >= 2 ? 40 : 60);
+      if (isPeak && w.wi >= 3) minutes = Math.round(minutes*0.75);
+      s = {...s,t:"輕鬆長跑",kind:"long",minutes,priority:5,note:"以輕鬆強度完成，跑走皆可；不加末段閾值。"};
+    }
+    if (day === "sat" && brick) s = {...s,t:"下車Brick",minutes:policy.novice ? 15 : w.key ? 30 : 20,priority:3,note:"長騎後接跑，取代當天其他跑課；疲勞高則取消。"};
+    w.run[day] = writeSession(s);
+  }
+  w.strength.tue = writeSession({sport:"strength",kind:"easy",t:strengthFor(w.phase,profile.strengthExp||"none").t,
+    strengthText:strengthFor(w.phase,profile.strengthExp||"none").x, minutes:taper ? 10 : isPeak ? 20 : 35,priority:3});
+  const all = [...Object.values(w.swim),...Object.values(w.bike),...Object.values(w.run),...Object.values(w.strength)];
+  const requested = all.reduce((a,s)=>a+s.minutes,0);
+  const cap = budgetMinutes(profile);
+  let excess = Math.max(0,requested-cap);
+  const changes = [];
+  // Remove recovery volume, then the second quality workout, then ancillary
+  // volume. Main quality and long sessions are protected until necessary.
+  const order = [...all].sort((a,b)=>a.priority-b.priority);
+  for (const s of order) {
+    if (!excess) break;
+    const floor = s.kind === "long" ? 30 : s.kind === "quality" ? 25 : s.sport === "strength" ? 10 : 20;
+    let reduction = Math.min(excess,Math.max(0,s.minutes-floor));
+    if (s.minutes-reduction > 0 && s.minutes-reduction < 15 && s.sport !== "strength") reduction = s.minutes;
+    if (reduction) { const before=s.minutes,title=s.t; writeSession(s,before-reduction); excess=Math.max(0,excess-reduction); changes.push(`${title} ${before}→${s.minutes}分`); }
+  }
+  for (const s of order) {
+    if (!excess) break;
+    if (s.minutes) { const before=s.minutes,title=s.t; writeSession(s,0); excess=Math.max(0,excess-before); changes.push(`省略${title} ${before}分`); }
+  }
+  const total = all.reduce((a,s)=>a+s.minutes,0);
+  w.budget = {cap,total,requested,changes,limited:total < requested,
+    runDays:Object.values(w.run).filter(s=>s.minutes>0).length,
+    qualityRuns:Object.values(w.run).filter(s=>s.minutes>0 && s.kind === "quality").length};
+  return w;
+}
 /* ---------------- plan builder ---------------- */
 function buildPlan(raceDateStr, dist, startStr, A) {
   const race = new Date(raceDateStr + "T00:00:00");
@@ -485,12 +566,13 @@ function buildPlan(raceDateStr, dist, startStr, A) {
   else start = mondayOfThisWeek();
   const days = Math.round((race - start) / 864e5);
   if (days < 21) return { error: "距比賽不足3週,建議直接進入減量與恢復。" };
-  const n = Math.min(40, Math.floor(days / 7) + 1);
+  if (days >= 280) return {error:"計畫最多40週，請將起始日移近比賽日期。"};
+  const n = Math.floor(days / 7) + 1;
   const taper = n >= 12 ? 2 : 1;
   const peak = n >= 16 ? 3 : n >= 12 ? 2 : 1;
   const trainWeeks = n - 1 - taper - peak;
   const base = Math.max(1, Math.round(trainWeeks * 0.4));
-  const build1 = Math.max(1, Math.round(trainWeeks * 0.3));
+  const build1 = Math.min(trainWeeks-base, Math.max(1, Math.round(trainWeeks * 0.3)));
   const build2 = Math.max(0, trainWeeks - base - build1);
 
   const weeks = [];
@@ -546,7 +628,7 @@ export default function IronmanPlan() {
   const [autoJumped, setAutoJumped] = useState(false);
   const distForJump = { id: profile.dist || "226", ...DISTS[profile.dist || "226"] };
   const athleteForJump = athleteModel(profile, distForJump);
-  const planForJump = useMemo(() => buildPlan(profile.raceDate, distForJump, profile.startDate, athleteForJump), [profile.raceDate, profile.dist, profile.startDate, profile.weekHours, profile.curSwimKm, profile.curBikeHours, profile.curRunKm, profile.longBikeKm, profile.longRunKm, profile.ftp, profile.weight, profile.hm, profile.lastBike, profile.lastRun, profile.triExp, profile.goalType]);
+  const planForJump = useMemo(() => buildPlan(profile.raceDate, distForJump, profile.startDate, athleteForJump), [profile]);
   useEffect(() => {
     if (autoJumped || !planForJump || planForJump.error) return;
     const cur = Math.floor((mondayOfThisWeek() - planForJump.start) / (7 * 864e5)) + 1;
@@ -561,7 +643,7 @@ export default function IronmanPlan() {
 
   const dist = { id: profile.dist || "226", ...DISTS[profile.dist || "226"] };
   const athlete = athleteModel(profile, dist);
-  const plan = useMemo(() => buildPlan(profile.raceDate, dist, profile.startDate, athlete), [profile.raceDate, profile.dist, profile.startDate, profile.weekHours, profile.curSwimKm, profile.curBikeHours, profile.curRunKm, profile.longBikeKm, profile.longRunKm, profile.ftp, profile.weight, profile.hm, profile.lastBike, profile.lastRun, profile.triExp, profile.goalType]);
+  const plan = useMemo(() => buildPlan(profile.raceDate, dist, profile.startDate, athlete), [profile]);
   const rp = runPaces(profile.hm, dist);
   const tpaceSec = parseMS(profile.tpace);
   const now = new Date();
@@ -574,27 +656,28 @@ export default function IronmanPlan() {
     );
   }
 
-  const { weeks, n: N, start } = plan;
+  const { weeks: rawWeeks, n: N, start } = plan;
+  const weeks = rawWeeks.map(w => w.race ? w : prepareWeek(w, profile, dist, athlete));
   const sel = Math.min(selected, N);
   const week = weeks.find((w) => w.n === sel);
   const phase = PHASES[week.phase];
   const dateFor = (weekN, dayKey) => { const d = new Date(start); d.setDate(d.getDate() + (weekN-1)*7 + DAY_OFFSET[dayKey]); return d; };
   const bikeTss = week.race ? 0 : (week.bike.wed.tss||0)+(week.bike.thu.tss||0)+(week.bike.sat.tss||0);
-  const run = week.race ? null : genRun(week.phase, week.wi, week.rest, rp, week.key, dist, athlete);
+  const run = week.race ? null : week.run;
   const monMonth = dateFor(week.n, "mon").getMonth() + 1;
   const RUNCOLOR = { wed:C.red, thu:C.green, fri:C.red, sat:C.green, sun:C.gold };
 
-  const mkRun = (day) => ({ id:`${day}-run`, color: RUNCOLOR[day], icon:<Footprints size={13}/>, title:`跑·${run[day].t}`, vol:run[day].v, detail:run[day].x });
-  const mkBike = (day) => ({ id:`${day}-bike`, color:C.power, icon:<BikeIcon size={13}/>, title:week.bike[day].t, vol:`${week.bike[day].v}·TSS${week.bike[day].tss}`, detail:renderBike(week.bike[day].x, profile.ftp) });
-  const mkSwim = (day) => ({ id:`${day}-swim`, color:C.water, icon:<Waves size={13}/>, title:week.swim[day].t, vol:week.swim[day].v, detail:renderSwim(week.swim[day].x, tpaceSec) });
+  const mkRun = (day) => !run[day]?.minutes ? null : ({ id:`${day}-run`, color: RUNCOLOR[day], icon:<Footprints size={13}/>, title:`跑·${run[day].t}`, vol:run[day].v, detail:run[day].x });
+  const mkBike = (day) => !week.bike[day]?.minutes ? null : ({ id:`${day}-bike`, color:C.power, icon:<BikeIcon size={13}/>, title:week.bike[day].t, vol:`${week.bike[day].v}·TSS${week.bike[day].tss}`, detail:renderBike(week.bike[day].x, profile.ftp) });
+  const mkSwim = (day) => !week.swim[day]?.minutes ? null : ({ id:`${day}-swim`, color:C.water, icon:<Waves size={13}/>, title:week.swim[day].t, vol:week.swim[day].v, detail:renderSwim(week.swim[day].x, tpaceSec) });
 
   const rows = week.race ? [] : [
     { day:"mon", items:[{ rest:true }] },
-    { day:"tue", items:[{ id:"tue-str", color:C.iron, icon:<Dumbbell size={13}/>, title:strengthFor(week.phase, profile.strengthExp).t, detail:strengthFor(week.phase, profile.strengthExp).x }, mkSwim("tue")] },
+    { day:"tue", items:[week.strength.tue.minutes ? { id:"tue-str", color:C.iron, icon:<Dumbbell size={13}/>, title:week.strength.tue.t, vol:week.strength.tue.v, detail:week.strength.tue.x } : null, mkSwim("tue")] },
     { day:"wed", items:[mkRun("wed"), mkBike("wed")] },
     { day:"thu", items:[mkRun("thu"), mkBike("thu")] },
     { day:"fri", items:[mkRun("fri"), mkSwim("fri")] },
-    { day:"sat", items:[mkRun("sat"), mkBike("sat")] },
+    { day:"sat", items:[mkBike("sat"), mkRun("sat")] },
     { day:"sun", items:[mkRun("sun"), mkSwim("sun")] },
   ];
 
@@ -633,6 +716,11 @@ export default function IronmanPlan() {
         {!week.race && <span className="mono" style={{ fontSize:10.5, color:C.power, marginLeft:"auto" }}>騎TSS≈{bikeTss}</span>}
       </div>
 
+      {!week.race && <div style={{fontSize:12,lineHeight:1.7,marginBottom:12,padding:10,background:C.surface,borderRadius:10}}>
+        <b>每週時間預算：{week.budget.total} / {week.budget.cap} 分</b> · 跑步{week.budget.runDays}次，其中品質{week.budget.qualityRuns}次
+        <div>含游泳、單車、跑步（含Brick）、重訓及課內熱身／休息／緩和；不含交通、更衣與正式比賽。所有課程以總分鐘為上限。</div>
+        {week.budget.limited && <div style={{color:C.power}}>原配置{week.budget.requested}分，已依優先級縮課：{week.budget.changes.join("；")}。此預算無法容納完整專項訓練，請依實際耐受度調整備賽目標。</div>}
+      </div>}
       {week.race ? (
         <RaceWeekView profile={profile} rp={rp} dist={dist} dateFor={dateFor} weekN={week.n} raceDate={new Date(profile.raceDate+"T00:00:00")} />
       ) : (
@@ -648,7 +736,7 @@ export default function IronmanPlan() {
                   <span className="mono" style={{ fontSize:9, color:C.muted }}>{fmtDate(d)}</span>
                 </div>
                 <div style={{ flex:1, padding:"6px 8px", display:"flex", flexDirection:"column", gap:4, minWidth:0 }}>
-                  {row.items.map((it, ii) => {
+                  {(row.items.filter(Boolean).length ? row.items.filter(Boolean) : [{rest:true}]).map((it, ii) => {
                     if (it.rest) return (
                       <div key={ii} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:C.muted, padding:"4px 2px" }}>
                         <Moon size={12}/> 全休
@@ -694,7 +782,7 @@ function Shell({ profile, editing, setEditing, saveProfile, rp, raceInfo, childr
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "20px 16px 50px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div>
-            <h1 className="osw" style={{ fontSize: 21, fontWeight: 600, margin: 0, letterSpacing: 0.5 }}>Ironman 個人化訓練面板 V4</h1>
+            <h1 className="osw" style={{ fontSize: 21, fontWeight: 600, margin: 0, letterSpacing: 0.5 }}>Ironman 個人化訓練面板 V5</h1>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{raceInfo || "輸入數據,自動生成整期課表"}</div>
           </div>
           <button onClick={() => setEditing((v) => !v)} style={{ background: C.surface, border:`1px solid ${C.line}`, borderRadius:10, padding:"7px 10px", color:C.text, display:"flex", gap:5, alignItems:"center", cursor:"pointer", fontSize:12, flexShrink:0 }}>
@@ -727,7 +815,7 @@ function Shell({ profile, editing, setEditing, saveProfile, rp, raceInfo, childr
               </div>
               <div style={{ fontSize:10.5, color:C.power, fontWeight:700, margin:"14px 0 6px", letterSpacing:0.5 }}>② 訓練耐受度（總週量）＋騎跑數據個人化</div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-                <Field label="每週可訓練 小時"><input type="number" min="3" step="0.5" value={profile.weekHours||""} onChange={(e)=>saveProfile({...profile,weekHours:+e.target.value})}/></Field>
+                <Field label="每週訓練時間上限 小時（含重訓／Brick）"><input type="number" min="0" step="0.5" value={profile.weekHours ?? ""} onChange={(e)=>saveProfile({...profile,weekHours:+e.target.value})}/></Field>
                 <Field label="目前每週游泳 km（只校正總量，不做強弱排名）"><input type="number" min="0" step="0.5" value={profile.curSwimKm||""} onChange={(e)=>saveProfile({...profile,curSwimKm:+e.target.value})}/></Field>
                 <Field label="目前每週單車 小時"><input type="number" min="0" step="0.5" value={profile.curBikeHours||""} onChange={(e)=>saveProfile({...profile,curBikeHours:+e.target.value})}/></Field>
                 <Field label="目前每週跑步 km"><input type="number" min="0" step="1" value={profile.curRunKm||""} onChange={(e)=>saveProfile({...profile,curRunKm:+e.target.value})}/></Field>
@@ -788,17 +876,18 @@ function AthleteSummary({ profile }) {
   return (
     <div style={{ background:C.surface, border:`1px solid ${C.line}`, borderRadius:12, padding:"9px 11px", marginBottom:10, fontSize:11.5, lineHeight:1.55 }}>
       <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
-        <b style={{ color:C.power }}>Athlete Profile</b>
+        <b style={{ color:C.power }}>Athlete Profile · V5</b>
         <span className="mono">{lvl} · Volume ×{A.volumeFactor.toFixed(2)} · Quality ×{A.qualityFactor.toFixed(2)}</span>
-        <span style={{ color:C.muted }}>每週可用 {A.hrs||"未填"}hr · 目標 {({finish:"完賽",pb:"PB",ag:"Age Group",custom:"自訂"}[A.goal]||A.goal)}</span>
+        <span style={{ color:C.muted }}>每週上限 {budgetMinutes(profile)/60}hr · 目標 {({finish:"完賽",pb:"PB",ag:"Age Group",custom:"自訂"}[A.goal]||A.goal)}</span>
       </div>
       <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:5 }}>
         <span style={{ border:`1px solid ${C.water}`, borderRadius:6, padding:"2px 6px", color:C.water }}>游泳：技術導向 · T-pace只定強度</span>
         <span style={{ border:`1px solid ${C.power}`, borderRadius:6, padding:"2px 6px", color:C.power }}>單車：{A.br.label} · {A.br.wkg.toFixed(2)} W/kg · 量×{A.br.bikeFactor.toFixed(2)}</span>
         <span style={{ border:`1px solid ${C.red}`, borderRadius:6, padding:"2px 6px", color:C.red }}>跑步：HM {A.br.hmPace?paceStr(A.br.hmPace):"未填"}/km · 量×{A.br.runFactor.toFixed(2)}</span>
       </div>
+      <div>Race IF：{raceIFFor(profile,dist).map(v=>Math.round(v*100)).join("–")}% FTP · 跑步基準{runPolicy(profile,dist).days}次／週，實際依預算及階段縮減；首次／完賽導向以輕鬆跑為主。</div>
       {A.readiness.length > 0 && <div style={{ color:C.red, marginTop:4 }}>⚠ {A.readiness.join("；")}</div>}
-      <div style={{ color:C.muted, marginTop:4 }}>游泳不以T-pace做強弱排名；單車用FTP/Wkg＋單車耐久資料、跑步用半馬PB＋跑量/長跑資料做相對強弱判斷。騎跑只小幅重新分配負荷，總量仍受每週可用時間與既有訓練量限制。</div>
+      <div style={{ color:C.muted, marginTop:4 }}>游泳不以T-pace做強弱排名；單車用FTP/Wkg＋單車耐久資料、跑步用半馬PB＋跑量/長跑資料做相對強弱判斷。Race IF為保守規則估算，依經驗、目標、跑力及耐久資料調整；需以長騎實測驗證，不能當作完賽保證。</div>
     </div>
   );
 }
@@ -881,6 +970,7 @@ function MiniBtn({ onClick, children }) {
 
 /* ---------------- race week ---------------- */
 function RaceWeekView({ profile, rp, dist, dateFor, weekN, raceDate }) {
+  dist = {...dist, bikeIF:raceIFFor(profile,dist)};
   const raceDayIdx = (raceDate.getDay() + 6) % 7;
   const keys = ["mon","tue","wed","thu","fri","sat","sun"];
   const tasks = [
@@ -892,9 +982,19 @@ function RaceWeekView({ profile, rp, dist, dateFor, weekN, raceDate }) {
     "檢錄/託運;15分極輕活動;確認氣象;早睡",
   ];
   const preDays = keys.slice(0, raceDayIdx);
-  const chosen = tasks.slice(Math.max(0, tasks.length - preDays.length));
+  let remaining = budgetMinutes(profile);
+  const durations = [0,25,30,25,0,15];
+  const offset = Math.max(0,tasks.length-preDays.length);
+  const chosen = tasks.slice(offset).map((task,i)=>{
+    const requested=durations[offset+i];
+    if (!requested) return task;
+    if (remaining < requested) return "休息／裝備確認（本週時間預算已保留給其他喚醒課）";
+    remaining -= requested;
+    return `${task}；總計${requested}分，含熱身與緩和，時間到即結束`;
+  });
   return (
     <div>
+      <div style={{fontSize:12,marginBottom:10}}>賽前訓練 {budgetMinutes(profile)-remaining} / {budgetMinutes(profile)} 分；正式比賽不計入訓練預算。</div>
       {preDays.length > 0 && (
         <div style={{ border:`1px solid ${C.line}`, borderRadius:12, overflow:"hidden", marginBottom:10, background:C.surface }}>
           {preDays.map((kk, i) => (
