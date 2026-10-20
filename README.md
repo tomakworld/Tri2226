@@ -1,56 +1,65 @@
-# 訓練課表 · 四合一
+# 訓練課表集（A 版，四份合一）
 
-一個 Vite + React 專案,四份課表用 hash 路由分開。
+Vite + React，用 hash 路由把四份課表放在同一個網站。
 
-| 路徑 | 內容 |
+| 網址 | 內容 |
 |---|---|
-| `/` | 三鐵通用產生器(226 / 113) |
-| `#/season` | Season 超長距離(游5k / 騎205k / 跑50k,2026-11-08) |
-| `#/sub3` | Sub-3 全馬產生器(任何人填自己的數據) |
-| `#/tomak` | tomak 專屬 Sub-3(2027-01-10 渣打) |
-
-## 為什麼不能直接開 .jsx
-
-`.jsx` 是 React 原始碼,瀏覽器看不懂。要先經過 build 變成 HTML + JS 才能開。
-這個資料夾就是建好的專案,照下面做即可。
+| `/` | 三鐵 226/113 產生器 |
+| `/#/season` | Season 超長距離（游 5k / 騎 205k / 跑 50k） |
+| `/#/sub3` | Sub-3 全馬產生器（任何人填自己的數據） |
+| `/#/tomak` | tomak 專屬 Sub-3（2027/01/10 渣打） |
 
 ## Zeabur 部署
 
-1. 把整個資料夾推到一個 GitHub repo(或直接用 Zeabur 的上傳)
-2. Zeabur 會自動偵測到 Vite,不用額外設定
-3. 若要手動指定:
-   - Build Command: `npm run build`
-   - Output Directory: `dist`
-   - Install Command: `npm install`
+直接把整個資料夾推上 Git，Zeabur 會自動偵測成 Vite 專案。
 
-Zeabur 偵測為 Static 時只要 `dist` 就好;偵測為 Node 服務時會跑 `npm run preview`,
-vite.config.js 裡已經設好 `host: 0.0.0.0` 與 `PORT` 環境變數,兩種都能動。
+- Build command：`npm run build`
+- Output directory：`dist`
+- Node：18 以上（package.json 的 engines 已指定）
 
-## 本機測試
+## ⚠️ build failed 的話，先看這三個
 
-```bash
-npm install
-npm run dev        # 開發,看 http://localhost:5173
-npm run build      # 產生 dist/
-npm run preview    # 預覽 build 後的結果
-```
+1. **devDependencies 不要有 `playwright`、`puppeteer`**
+   它們的 postinstall 會下載幾百 MB 的瀏覽器，build 容器常常在這裡掛掉。
+   本專案已移除。如果你本機跑過測試又裝回去了，推之前要再刪掉。
 
-## 之後要更新某一份課表
+2. **檔名大小寫要完全一致**
+   Linux 容器區分大小寫，`main.jsx` 寫 `./Tomak.jsx`，檔案就必須叫 `Tomak.jsx`。
+   直接把下載的 `tomak-sub3.jsx` 丟進 src/ 是不行的 —— 一定要改名。
 
-把新的 .jsx 覆蓋到對應檔案就好,其他都不用動:
+3. **package-lock.json 要跟 package.json 同步**
+   改過 package.json 就重跑一次 `npm install` 讓 lock 更新，不然 `npm ci` 會失敗。
 
-| 課表 | 檔案 |
+## 要新增第五份課表
+
+三個步驟缺一不可（只丟檔案進去是沒有用的，路由找不到會退回第一個）：
+
+1. 檔案放到 `src/`，開頭大寫，例如 `src/Alice.jsx`
+2. `src/main.jsx` 最上面加一行 import：
+   ```js
+   import AlicePlan from "./Alice.jsx";
+   ```
+3. 同一個檔案的 `ROUTES` 陣列加一筆：
+   ```js
+   { hash: "#/alice", label: "Alice", el: <AlicePlan /> },
+   ```
+
+## 只是要換掉某一份課表
+
+把新的 .jsx 覆蓋到對應檔名就好，main.jsx 不用動：
+
+| 課表 | 檔名 |
 |---|---|
 | 三鐵產生器 | `src/App.jsx` |
 | Season | `src/Season.jsx` |
 | Sub-3 產生器 | `src/Sub3.jsx` |
 | tomak | `src/Tomak.jsx` |
 
-注意:這四個檔的 `export default` 名稱不同(IronmanPlan / SeasonPlan / Sub3Plan / App),
-但 `main.jsx` 是用 default import,所以換檔案不用改 main.jsx。
+## 本機跑
 
-## 資料儲存
-
-每份課表的設定存在瀏覽器 localStorage,各自獨立的 key。
-Sub-3 產生器另外支援 `?d=` 網址參數,複製連結就能把設定帶到別的裝置。
-手機瀏覽器可能清除網站資料,建議把連結加入書籤或主畫面。
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # 產生 dist/
+npm run preview  # 預覽 build 結果
+```
